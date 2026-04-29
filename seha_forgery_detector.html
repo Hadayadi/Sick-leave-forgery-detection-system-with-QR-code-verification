@@ -281,18 +281,18 @@
     <div class="key-panel-header">
       <span class="key-lock">🔑</span>
       <div>
-        <div class="key-panel-title">Anthropic API Key</div>
+        <div class="key-panel-title">Google Gemini API Key</div>
         <div class="key-panel-sub">Required to run AI analysis — stored only in your browser</div>
       </div>
     </div>
     <div class="key-input-row">
-      <input class="key-input" type="password" id="apiKeyInput" placeholder="sk-ant-api03-..." autocomplete="off" spellcheck="false">
+      <input class="key-input" type="password" id="apiKeyInput" placeholder="AIzaSy..." value="AIzaSyCb-MWwnSf4kHKp4-YU05z5IbCyORhQAys" autocomplete="off" spellcheck="false">
       <button class="key-save-btn" id="keySaveBtn">Save key</button>
     </div>
     <div class="key-status" id="keyStatus"></div>
     <div class="key-hint">
-      Get your free API key at <a href="https://console.anthropic.com/settings/keys" target="_blank">console.anthropic.com</a>.
-      Your key is saved in your browser's local storage and never sent anywhere except directly to the Anthropic API.
+      Get your free API key at <a href="https://aistudio.google.com/app/apikey" target="_blank">Google AI Studio</a>.
+      Your key is saved in your browser's local storage and never sent anywhere except directly to the Google API.
     </div>
   </div>
 
@@ -333,7 +333,7 @@
 
 <div class="footer">
   Verify documents at <a href="https://www.seha.sa/#/inquiries/slenquiry" target="_blank">www.seha.sa/#/inquiries/slenquiry</a>
-  &nbsp;·&nbsp; Powered by Claude AI
+  &nbsp;·&nbsp; Powered by Google Gemini
 </div>
 
 <script>
@@ -362,7 +362,7 @@ Common forgery signs:
 - Missing National Health Information Centre branding
 - Text that appears overlaid or different color/font from rest of document
 
-Respond ONLY in this exact JSON (no markdown fences, no extra text):
+Respond ONLY in this exact JSON schema:
 {
   "verdict": "FORGED",
   "confidence": "High",
@@ -391,8 +391,9 @@ Status options: PASS | FAIL | WARN | UNKNOWN
 Always include these 10 checks in order: QR Code Destination, Leave ID Format, Document Structure, Date Consistency, Leave Duration Match, Hospital License Number, Verification URL, Print Timestamp, Visual Integrity, Seha Branding.`;
 
 // ── API Key management ──
-const KEY_STORAGE = 'seha_checker_api_key';
-let apiKey = localStorage.getItem(KEY_STORAGE) || '';
+const KEY_STORAGE = 'seha_checker_gemini_key';
+// Try to get saved key, fallback to input value
+let apiKey = localStorage.getItem(KEY_STORAGE) || document.getElementById('apiKeyInput').value;
 
 const apiKeyInput  = document.getElementById('apiKeyInput');
 const keySaveBtn   = document.getElementById('keySaveBtn');
@@ -400,7 +401,7 @@ const keyStatus    = document.getElementById('keyStatus');
 const uploadPanel  = document.getElementById('uploadPanel');
 
 function applyKeyState() {
-  if (apiKey && apiKey.startsWith('sk-ant')) {
+  if (apiKey && apiKey.startsWith('AIzaSy')) {
     uploadPanel.classList.remove('locked');
     apiKeyInput.value = apiKey;
     keyStatus.className = 'key-status ok';
@@ -419,9 +420,9 @@ keySaveBtn.addEventListener('click', () => {
     keyStatus.style.display = 'block';
     return;
   }
-  if (!val.startsWith('sk-ant')) {
+  if (!val.startsWith('AIzaSy')) {
     keyStatus.className = 'key-status err';
-    keyStatus.textContent = 'That doesn\'t look like a valid Anthropic API key. It should start with sk-ant...';
+    keyStatus.textContent = 'That doesn\'t look like a valid Gemini API key. It should start with AIzaSy...';
     keyStatus.style.display = 'block';
     return;
   }
@@ -571,7 +572,7 @@ function renderResult(data) {
 analyzeBtn.addEventListener('click', async () => {
   if (!fileData) return;
   if (!apiKey) {
-    errorBox.textContent = '⚠️ Please enter and save your Anthropic API key first.';
+    errorBox.textContent = '⚠️ Please enter and save your Gemini API key first.';
     errorBox.style.display = 'block';
     return;
   }
@@ -581,31 +582,34 @@ analyzeBtn.addEventListener('click', async () => {
   setStatus('Sending document to AI for analysis...');
 
   try {
-    const contentBlock = fileData.mediaType === 'application/pdf'
-      ? { type: 'document', source: { type: 'base64', media_type: 'application/pdf', data: fileData.base64 } }
-      : { type: 'image', source: { type: 'base64', media_type: fileData.mediaType, data: fileData.base64 } };
+    const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`;
+
+    const payload = {
+      systemInstruction: {
+        parts: [{ text: SYSTEM_PROMPT }]
+      },
+      generationConfig: {
+        responseMimeType: "application/json"
+      },
+      contents: [{
+        role: "user",
+        parts: [
+          {
+            inlineData: {
+              mimeType: fileData.mediaType,
+              data: fileData.base64
+            }
+          },
+          { text: 'Analyze this sick leave document for authenticity and return JSON only.' }
+        ]
+      }]
+    };
 
     setStatus('Reading document content...');
-    const resp = await fetch('https://api.anthropic.com/v1/messages', {
+    const resp = await fetch(url, {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'x-api-key': apiKey,
-        'anthropic-version': '2023-06-01',
-        'anthropic-dangerous-direct-browser-access': 'true'
-      },
-      body: JSON.stringify({
-        model: 'claude-sonnet-4-20250514',
-        max_tokens: 1800,
-        system: SYSTEM_PROMPT,
-        messages: [{
-          role: 'user',
-          content: [
-            contentBlock,
-            { type: 'text', text: 'Analyze this sick leave document for authenticity and return JSON only.' }
-          ]
-        }]
-      })
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload)
     });
 
     if (!resp.ok) {
@@ -615,14 +619,13 @@ analyzeBtn.addEventListener('click', async () => {
 
     setStatus('Processing results...');
     const data = await resp.json();
-    const raw = (data.content || []).map(b => b.text || '').join('').trim();
+    const rawText = data.candidates[0].content.parts[0].text;
 
     let parsed;
     try {
-      const clean = raw.replace(/^```json\s*/i, '').replace(/```\s*$/i, '').trim();
-      parsed = JSON.parse(clean);
+      parsed = JSON.parse(rawText);
     } catch {
-      throw new Error('Could not parse AI response. Raw: ' + raw.slice(0, 300));
+      throw new Error('Could not parse AI response.');
     }
 
     statusBar.classList.remove('show');
