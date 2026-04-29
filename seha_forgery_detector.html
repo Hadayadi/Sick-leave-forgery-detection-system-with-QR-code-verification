@@ -15,26 +15,22 @@
     --green-300: #5DCAA8;
     --green-100: #9FE1CB;
     --green-50:  #E1F5EE;
-
     --red-800: #791F1F;
     --red-600: #A32D2D;
     --red-400: #E24B4A;
     --red-100: #F7C1C1;
     --red-50:  #FCEBEB;
-
     --amber-800: #633806;
     --amber-600: #854F0B;
     --amber-400: #BA7517;
     --amber-100: #FAC775;
     --amber-50:  #FAEEDA;
-
     --gray-900: #1A1A1A;
     --gray-700: #444441;
     --gray-500: #888780;
     --gray-300: #B4B2A9;
     --gray-100: #D3D1C7;
     --gray-50:  #F5F4F0;
-
     --surface: #FFFFFF;
     --surface-alt: #F8F7F4;
     --text-primary: #1A1A1A;
@@ -42,76 +38,82 @@
     --text-tertiary: #888780;
     --border: #E0DED7;
     --border-strong: #C4C2BA;
-
     --radius-sm: 6px;
     --radius-md: 10px;
     --radius-lg: 14px;
     --radius-xl: 18px;
-
     font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
   }
 
-  body {
-    background: var(--gray-50);
-    color: var(--text-primary);
-    min-height: 100vh;
-    padding: 0;
-  }
+  body { background: var(--gray-50); color: var(--text-primary); min-height: 100vh; }
 
-  /* ── Top Bar ── */
   .topbar {
-    background: var(--green-800);
-    padding: 14px 24px;
-    display: flex;
-    align-items: center;
-    gap: 14px;
-    position: sticky;
-    top: 0;
-    z-index: 100;
+    background: var(--green-800); padding: 14px 24px;
+    display: flex; align-items: center; gap: 14px;
+    position: sticky; top: 0; z-index: 100;
   }
   .topbar-icon {
-    width: 38px; height: 38px;
-    background: var(--green-500);
+    width: 38px; height: 38px; background: var(--green-500);
     border-radius: var(--radius-md);
-    display: flex; align-items: center; justify-content: center;
-    flex-shrink: 0;
+    display: flex; align-items: center; justify-content: center; flex-shrink: 0;
   }
   .topbar-icon svg { width: 20px; height: 20px; stroke: var(--green-50); fill: none; stroke-width: 2; stroke-linecap: round; }
   .topbar-title { color: #fff; font-size: 16px; font-weight: 600; letter-spacing: -0.01em; }
   .topbar-sub { color: var(--green-100); font-size: 12px; margin-top: 1px; }
   .topbar-badge {
-    margin-left: auto;
-    background: var(--green-700);
-    color: var(--green-100);
-    font-size: 11px;
-    padding: 4px 10px;
-    border-radius: 99px;
-    letter-spacing: 0.03em;
+    margin-left: auto; background: var(--green-700); color: var(--green-100);
+    font-size: 11px; padding: 4px 10px; border-radius: 99px; letter-spacing: 0.03em;
   }
 
-  /* ── Main layout ── */
   .main { max-width: 780px; margin: 0 auto; padding: 32px 24px 80px; }
+
+  /* ── API Key Panel ── */
+  .key-panel {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: var(--radius-xl); padding: 24px; margin-bottom: 20px;
+  }
+  .key-panel-header { display: flex; align-items: center; gap: 10px; margin-bottom: 14px; }
+  .key-lock { font-size: 20px; }
+  .key-panel-title { font-size: 14px; font-weight: 600; color: var(--text-primary); }
+  .key-panel-sub { font-size: 12px; color: var(--text-tertiary); margin-top: 2px; }
+  .key-input-row { display: flex; gap: 10px; }
+  .key-input {
+    flex: 1; padding: 10px 14px; font-size: 13px;
+    border: 1px solid var(--border-strong); border-radius: var(--radius-md);
+    background: var(--surface-alt); color: var(--text-primary);
+    font-family: 'Courier New', monospace; letter-spacing: 0.02em;
+    outline: none; transition: border-color 0.15s;
+  }
+  .key-input:focus { border-color: var(--green-500); }
+  .key-input::placeholder { color: var(--text-tertiary); letter-spacing: 0; font-family: inherit; }
+  .key-save-btn {
+    padding: 10px 18px; background: var(--green-700); color: #fff;
+    border: none; border-radius: var(--radius-md); font-size: 13px; font-weight: 600;
+    cursor: pointer; white-space: nowrap; transition: background 0.15s;
+  }
+  .key-save-btn:hover { background: var(--green-800); }
+  .key-status {
+    margin-top: 10px; font-size: 12px; padding: 8px 12px;
+    border-radius: var(--radius-sm); display: none;
+  }
+  .key-status.ok { display: block; background: var(--green-50); color: var(--green-800); border: 1px solid var(--green-100); }
+  .key-status.err { display: block; background: var(--red-50); color: var(--red-600); border: 1px solid var(--red-100); }
+  .key-hint { margin-top: 10px; font-size: 12px; color: var(--text-tertiary); line-height: 1.5; }
+  .key-hint a { color: var(--green-700); }
 
   /* ── Upload panel ── */
   .panel {
-    background: var(--surface);
-    border: 1px solid var(--border);
-    border-radius: var(--radius-xl);
-    padding: 28px;
-    margin-bottom: 20px;
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: var(--radius-xl); padding: 28px; margin-bottom: 20px;
   }
-
   .panel-title { font-size: 13px; font-weight: 600; color: var(--text-tertiary); text-transform: uppercase; letter-spacing: 0.06em; margin-bottom: 16px; }
+  .panel.locked { opacity: 0.45; pointer-events: none; user-select: none; }
 
   .drop-zone {
-    border: 2px dashed var(--border-strong);
-    border-radius: var(--radius-lg);
-    padding: 40px 24px;
-    text-align: center;
-    cursor: pointer;
+    border: 2px dashed var(--border-strong); border-radius: var(--radius-lg);
+    padding: 40px 24px; text-align: center; cursor: pointer;
     transition: border-color 0.15s, background 0.15s;
-    position: relative;
-    background: var(--surface-alt);
+    position: relative; background: var(--surface-alt);
   }
   .drop-zone:hover, .drop-zone.drag { border-color: var(--green-500); background: var(--green-50); }
   .drop-zone input { position: absolute; inset: 0; opacity: 0; cursor: pointer; }
@@ -122,11 +124,8 @@
 
   .file-row {
     display: flex; align-items: center; gap: 12px;
-    padding: 12px 14px;
-    background: var(--green-50);
-    border: 1px solid var(--green-100);
-    border-radius: var(--radius-md);
-    margin-top: 14px;
+    padding: 12px 14px; background: var(--green-50);
+    border: 1px solid var(--green-100); border-radius: var(--radius-md); margin-top: 14px;
   }
   .file-row-icon { font-size: 24px; }
   .file-row-info { flex: 1; }
@@ -134,70 +133,47 @@
   .file-row-size { font-size: 11px; color: var(--green-700); margin-top: 2px; }
   .file-row-remove {
     background: none; border: none; cursor: pointer;
-    color: var(--green-700); font-size: 16px; padding: 4px 6px;
-    border-radius: 4px; line-height: 1;
+    color: var(--green-700); font-size: 16px; padding: 4px 6px; border-radius: 4px; line-height: 1;
   }
   .file-row-remove:hover { background: var(--red-50); color: var(--red-400); }
 
   .analyze-btn {
-    width: 100%;
-    margin-top: 16px;
-    padding: 13px 20px;
-    background: var(--green-700);
-    color: #fff;
-    border: none;
-    border-radius: var(--radius-md);
-    font-size: 15px;
-    font-weight: 600;
-    cursor: pointer;
+    width: 100%; margin-top: 16px; padding: 13px 20px;
+    background: var(--green-700); color: #fff; border: none;
+    border-radius: var(--radius-md); font-size: 15px; font-weight: 600; cursor: pointer;
     display: flex; align-items: center; justify-content: center; gap: 9px;
-    transition: background 0.15s, transform 0.1s;
-    letter-spacing: -0.01em;
+    transition: background 0.15s, transform 0.1s; letter-spacing: -0.01em;
   }
   .analyze-btn:hover:not(:disabled) { background: var(--green-800); }
   .analyze-btn:active:not(:disabled) { transform: scale(0.99); }
   .analyze-btn:disabled { opacity: 0.45; cursor: not-allowed; }
   .analyze-btn svg { width: 17px; height: 17px; }
 
-  /* ── Status bar ── */
   .status-bar {
-    display: none;
-    align-items: center; gap: 10px;
-    padding: 12px 16px;
-    background: var(--surface);
-    border: 1px solid var(--border);
-    border-radius: var(--radius-md);
-    margin-bottom: 20px;
-    font-size: 13px;
-    color: var(--text-secondary);
+    display: none; align-items: center; gap: 10px; padding: 12px 16px;
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: var(--radius-md); margin-bottom: 20px;
+    font-size: 13px; color: var(--text-secondary);
   }
   .status-bar.show { display: flex; }
   .spinner {
     width: 16px; height: 16px; flex-shrink: 0;
-    border: 2px solid var(--border);
-    border-top-color: var(--green-500);
-    border-radius: 50%;
-    animation: spin 0.7s linear infinite;
+    border: 2px solid var(--border); border-top-color: var(--green-500);
+    border-radius: 50%; animation: spin 0.7s linear infinite;
   }
   @keyframes spin { to { transform: rotate(360deg); } }
 
-  /* ── Result card ── */
   .result-card {
-    background: var(--surface);
-    border-radius: var(--radius-xl);
-    border: 2px solid var(--border);
-    overflow: hidden;
+    background: var(--surface); border-radius: var(--radius-xl);
+    border: 2px solid var(--border); overflow: hidden;
   }
-  .result-card.forged  { border-color: var(--red-400); }
+  .result-card.forged   { border-color: var(--red-400); }
   .result-card.authentic { border-color: var(--green-500); }
   .result-card.inconclusive { border-color: var(--amber-400); }
 
-  .verdict-banner {
-    padding: 20px 24px;
-    display: flex; align-items: center; gap: 14px;
-  }
-  .verdict-banner.forged { background: var(--red-50); }
-  .verdict-banner.authentic { background: var(--green-50); }
+  .verdict-banner { padding: 20px 24px; display: flex; align-items: center; gap: 14px; }
+  .verdict-banner.forged      { background: var(--red-50); }
+  .verdict-banner.authentic   { background: var(--green-50); }
   .verdict-banner.inconclusive { background: var(--amber-50); }
 
   .verdict-icon {
@@ -205,45 +181,37 @@
     display: flex; align-items: center; justify-content: center;
     flex-shrink: 0; font-size: 22px;
   }
-  .verdict-icon.forged { background: var(--red-400); }
-  .verdict-icon.authentic { background: var(--green-500); }
+  .verdict-icon.forged      { background: var(--red-400); }
+  .verdict-icon.authentic   { background: var(--green-500); }
   .verdict-icon.inconclusive { background: var(--amber-400); }
 
   .verdict-text h2 { font-size: 18px; font-weight: 700; }
-  .verdict-text h2.forged { color: var(--red-600); }
-  .verdict-text h2.authentic { color: var(--green-800); }
+  .verdict-text h2.forged      { color: var(--red-600); }
+  .verdict-text h2.authentic   { color: var(--green-800); }
   .verdict-text h2.inconclusive { color: var(--amber-600); }
   .verdict-text p { font-size: 13px; color: var(--text-secondary); margin-top: 3px; }
 
   .confidence-pill {
     margin-left: auto; flex-shrink: 0;
-    font-size: 12px; font-weight: 600; padding: 5px 13px;
-    border-radius: 99px;
+    font-size: 12px; font-weight: 600; padding: 5px 13px; border-radius: 99px;
   }
-  .confidence-pill.forged { background: var(--red-100); color: var(--red-800); }
-  .confidence-pill.authentic { background: var(--green-100); color: var(--green-900); }
+  .confidence-pill.forged      { background: var(--red-100); color: var(--red-800); }
+  .confidence-pill.authentic   { background: var(--green-100); color: var(--green-900); }
   .confidence-pill.inconclusive { background: var(--amber-100); color: var(--amber-800); }
 
-  .summary-section {
-    padding: 18px 24px;
-    border-top: 1px solid var(--border);
-  }
+  .summary-section { padding: 18px 24px; border-top: 1px solid var(--border); }
   .summary-section p { font-size: 14px; line-height: 1.65; color: var(--text-secondary); }
 
   .checks-section { padding: 0 24px 20px; }
   .section-label {
     font-size: 11px; font-weight: 700; text-transform: uppercase;
-    letter-spacing: 0.07em; color: var(--text-tertiary);
-    margin-bottom: 10px; padding-top: 16px;
+    letter-spacing: 0.07em; color: var(--text-tertiary); margin-bottom: 10px; padding-top: 16px;
   }
 
   .check-list { display: flex; flex-direction: column; gap: 7px; }
   .check-item {
-    display: flex; align-items: flex-start; gap: 10px;
-    padding: 10px 13px;
-    border: 1px solid var(--border);
-    border-radius: var(--radius-md);
-    background: var(--surface-alt);
+    display: flex; align-items: flex-start; gap: 10px; padding: 10px 13px;
+    border: 1px solid var(--border); border-radius: var(--radius-md); background: var(--surface-alt);
   }
   .check-item.fail { border-color: var(--red-100); background: var(--red-50); }
   .check-item.warn { border-color: var(--amber-100); background: var(--amber-50); }
@@ -252,56 +220,44 @@
   .check-dot {
     width: 20px; height: 20px; border-radius: 50%;
     display: flex; align-items: center; justify-content: center;
-    flex-shrink: 0; font-size: 11px; margin-top: 0px;
+    flex-shrink: 0; font-size: 11px;
   }
-  .check-dot.pass { background: var(--green-500); color: #fff; }
-  .check-dot.fail { background: var(--red-400); color: #fff; }
-  .check-dot.warn { background: var(--amber-400); color: #fff; }
+  .check-dot.pass    { background: var(--green-500); color: #fff; }
+  .check-dot.fail    { background: var(--red-400); color: #fff; }
+  .check-dot.warn    { background: var(--amber-400); color: #fff; }
   .check-dot.unknown { background: var(--gray-300); color: #fff; }
 
   .check-content { flex: 1; }
   .check-name { font-size: 13px; font-weight: 600; }
-  .check-name.pass { color: #3B6D11; }
-  .check-name.fail { color: var(--red-600); }
-  .check-name.warn { color: var(--amber-600); }
+  .check-name.pass    { color: #3B6D11; }
+  .check-name.fail    { color: var(--red-600); }
+  .check-name.warn    { color: var(--amber-600); }
   .check-name.unknown { color: var(--text-secondary); }
   .check-detail { font-size: 12px; color: var(--text-secondary); margin-top: 3px; line-height: 1.5; }
   .check-item.fail .check-detail { color: var(--red-600); }
   .check-item.warn .check-detail { color: var(--amber-600); }
 
-  /* ── Extracted data ── */
-  .fields-section {
-    padding: 16px 24px 24px;
-    border-top: 1px solid var(--border);
-  }
-  .fields-grid {
-    display: grid; grid-template-columns: 1fr 1fr;
-    gap: 10px; margin-top: 10px;
-  }
+  .fields-section { padding: 16px 24px 24px; border-top: 1px solid var(--border); }
+  .fields-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 10px; }
   .field-item { padding: 10px 13px; background: var(--surface-alt); border-radius: var(--radius-md); border: 1px solid var(--border); }
   .field-label { font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.06em; color: var(--text-tertiary); }
   .field-value { font-size: 13px; color: var(--text-primary); margin-top: 4px; font-weight: 500; word-break: break-all; }
 
-  /* ── Error ── */
   .error-box {
     padding: 14px 18px; border-radius: var(--radius-md);
     background: var(--red-50); border: 1px solid var(--red-100);
-    color: var(--red-600); font-size: 13px; line-height: 1.6;
-    margin-bottom: 20px;
+    color: var(--red-600); font-size: 13px; line-height: 1.6; margin-bottom: 20px;
   }
 
-  /* ── Footer ── */
-  .footer {
-    text-align: center; padding: 32px 24px 16px;
-    font-size: 12px; color: var(--text-tertiary);
-  }
+  .footer { text-align: center; padding: 32px 24px 16px; font-size: 12px; color: var(--text-tertiary); }
   .footer a { color: var(--green-700); text-decoration: none; }
 
   @media (max-width: 540px) {
     .main { padding: 16px 12px 60px; }
-    .panel { padding: 18px; }
+    .panel, .key-panel { padding: 18px; }
     .fields-grid { grid-template-columns: 1fr; }
     .topbar-badge { display: none; }
+    .key-input-row { flex-direction: column; }
   }
 </style>
 </head>
@@ -320,7 +276,28 @@
 
 <div class="main">
 
-  <div class="panel">
+  <!-- API Key Panel -->
+  <div class="key-panel">
+    <div class="key-panel-header">
+      <span class="key-lock">🔑</span>
+      <div>
+        <div class="key-panel-title">Anthropic API Key</div>
+        <div class="key-panel-sub">Required to run AI analysis — stored only in your browser</div>
+      </div>
+    </div>
+    <div class="key-input-row">
+      <input class="key-input" type="password" id="apiKeyInput" placeholder="sk-ant-api03-..." autocomplete="off" spellcheck="false">
+      <button class="key-save-btn" id="keySaveBtn">Save key</button>
+    </div>
+    <div class="key-status" id="keyStatus"></div>
+    <div class="key-hint">
+      Get your free API key at <a href="https://console.anthropic.com/settings/keys" target="_blank">console.anthropic.com</a>.
+      Your key is saved in your browser's local storage and never sent anywhere except directly to the Anthropic API.
+    </div>
+  </div>
+
+  <!-- Upload Panel -->
+  <div class="panel locked" id="uploadPanel">
     <div class="panel-title">Upload document</div>
     <div class="drop-zone" id="dropZone">
       <input type="file" id="fileInput" accept=".pdf,image/*">
@@ -350,7 +327,6 @@
   </div>
 
   <div class="error-box" id="errorBox" style="display:none;"></div>
-
   <div id="resultArea"></div>
 
 </div>
@@ -376,8 +352,8 @@ A genuine Seha sick leave report (تقرير إجازة مرضية) must have AL
 10. Print timestamp at bottom left (time + date PDF was generated)
 
 Common forgery signs:
-- QR code missing, blurry, or wrong URL
-- Dates inconsistent or in the future relative to issue
+- QR code missing, blurry, or leading to wrong URL
+- Dates inconsistent or in the future relative to issue date
 - Print date much later than issue date (>7 days gap is suspicious)
 - Employer field filled in (genuine documents leave it blank)
 - Inconsistent fonts or obvious text edits
@@ -414,6 +390,50 @@ Verdict options: FORGED | AUTHENTIC | INCONCLUSIVE
 Status options: PASS | FAIL | WARN | UNKNOWN
 Always include these 10 checks in order: QR Code Destination, Leave ID Format, Document Structure, Date Consistency, Leave Duration Match, Hospital License Number, Verification URL, Print Timestamp, Visual Integrity, Seha Branding.`;
 
+// ── API Key management ──
+const KEY_STORAGE = 'seha_checker_api_key';
+let apiKey = localStorage.getItem(KEY_STORAGE) || '';
+
+const apiKeyInput  = document.getElementById('apiKeyInput');
+const keySaveBtn   = document.getElementById('keySaveBtn');
+const keyStatus    = document.getElementById('keyStatus');
+const uploadPanel  = document.getElementById('uploadPanel');
+
+function applyKeyState() {
+  if (apiKey && apiKey.startsWith('sk-ant')) {
+    uploadPanel.classList.remove('locked');
+    apiKeyInput.value = apiKey;
+    keyStatus.className = 'key-status ok';
+    keyStatus.textContent = '✓ API key saved — you can now upload and analyze documents';
+    keyStatus.style.display = 'block';
+  } else {
+    uploadPanel.classList.add('locked');
+  }
+}
+
+keySaveBtn.addEventListener('click', () => {
+  const val = apiKeyInput.value.trim();
+  if (!val) {
+    keyStatus.className = 'key-status err';
+    keyStatus.textContent = 'Please enter your API key first.';
+    keyStatus.style.display = 'block';
+    return;
+  }
+  if (!val.startsWith('sk-ant')) {
+    keyStatus.className = 'key-status err';
+    keyStatus.textContent = 'That doesn\'t look like a valid Anthropic API key. It should start with sk-ant...';
+    keyStatus.style.display = 'block';
+    return;
+  }
+  apiKey = val;
+  localStorage.setItem(KEY_STORAGE, apiKey);
+  applyKeyState();
+});
+
+apiKeyInput.addEventListener('keydown', e => { if (e.key === 'Enter') keySaveBtn.click(); });
+applyKeyState();
+
+// ── File handling ──
 let fileData = null;
 
 const dropZone   = document.getElementById('dropZone');
@@ -478,10 +498,7 @@ removeBtn.addEventListener('click', () => {
   clearResults();
 });
 
-function setStatus(text) {
-  statusText.textContent = text;
-  statusBar.classList.add('show');
-}
+function setStatus(text) { statusText.textContent = text; statusBar.classList.add('show'); }
 
 function statusToClass(s) {
   s = (s || '').toUpperCase();
@@ -490,7 +507,6 @@ function statusToClass(s) {
   if (s === 'WARN') return 'warn';
   return 'unknown';
 }
-
 function statusIcon(s) {
   if (s === 'pass') return '✓';
   if (s === 'fail') return '✕';
@@ -501,7 +517,6 @@ function statusIcon(s) {
 function renderResult(data) {
   const vRaw = (data.verdict || 'inconclusive').toLowerCase();
   const v = ['forged','authentic','inconclusive'].includes(vRaw) ? vRaw : 'inconclusive';
-
   const vLabel = v === 'forged' ? 'Suspected Forgery' : v === 'authentic' ? 'Appears Authentic' : 'Inconclusive';
   const vEmoji = v === 'forged' ? '🚨' : v === 'authentic' ? '✅' : '⚠️';
 
@@ -530,7 +545,7 @@ function renderResult(data) {
     <div class="fields-section">
       <div class="section-label">Extracted document data</div>
       <div class="fields-grid">
-        ${pairs.map(([l, v]) => `<div class="field-item"><div class="field-label">${l}</div><div class="field-value">${v}</div></div>`).join('')}
+        ${pairs.map(([l, val]) => `<div class="field-item"><div class="field-label">${l}</div><div class="field-value">${val}</div></div>`).join('')}
       </div>
     </div>` : '';
 
@@ -544,9 +559,7 @@ function renderResult(data) {
         </div>
         <span class="confidence-pill ${v}">${data.confidence || ''}</span>
       </div>
-      <div class="summary-section">
-        <p>${data.summary || ''}</p>
-      </div>
+      <div class="summary-section"><p>${data.summary || ''}</p></div>
       <div class="checks-section">
         <div class="section-label">Checks performed</div>
         <div class="check-list">${checksHtml}</div>
@@ -557,6 +570,11 @@ function renderResult(data) {
 
 analyzeBtn.addEventListener('click', async () => {
   if (!fileData) return;
+  if (!apiKey) {
+    errorBox.textContent = '⚠️ Please enter and save your Anthropic API key first.';
+    errorBox.style.display = 'block';
+    return;
+  }
   analyzeBtn.disabled = true;
   analyzeBtn.textContent = 'Analyzing...';
   clearResults();
@@ -570,7 +588,12 @@ analyzeBtn.addEventListener('click', async () => {
     setStatus('Reading document content...');
     const resp = await fetch('https://api.anthropic.com/v1/messages', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: {
+        'Content-Type': 'application/json',
+        'x-api-key': apiKey,
+        'anthropic-version': '2023-06-01',
+        'anthropic-dangerous-direct-browser-access': 'true'
+      },
       body: JSON.stringify({
         model: 'claude-sonnet-4-20250514',
         max_tokens: 1800,
