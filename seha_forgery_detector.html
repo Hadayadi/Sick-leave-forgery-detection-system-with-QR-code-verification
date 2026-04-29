@@ -1,15 +1,258 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width,initial-scale=1.0">
-  <title>Seha Sick Leave Authenticity Checker</title>
-  <style>
-    /* ... [Unchanged CSS from your version: UI, colors, responsive, etc.] ... */
-    /* For brevity, reuse your style unchanged */
-  </style>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Seha Sick Leave Authenticity Checker</title>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --green-900: #04342C;
+    --green-800: #085041;
+    --green-700: #0F6E56;
+    --green-500: #1D9E75;
+    --green-300: #5DCAA8;
+    --green-100: #9FE1CB;
+    --green-50:  #E1F5EE;
+    --red-800: #791F1F;
+    --red-600: #A32D2D;
+    --red-400: #E24B4A;
+    --red-100: #F7C1C1;
+    --red-50:  #FCEBEB;
+    --amber-800: #633806;
+    --amber-600: #854F0B;
+    --amber-400: #BA7517;
+    --amber-100: #FAC775;
+    --amber-50:  #FAEEDA;
+    --gray-900: #1A1A1A;
+    --gray-700: #444441;
+    --gray-500: #888780;
+    --gray-300: #B4B2A9;
+    --gray-100: #D3D1C7;
+    --gray-50:  #F5F4F0;
+    --surface: #FFFFFF;
+    --surface-alt: #F8F7F4;
+    --text-primary: #1A1A1A;
+    --text-secondary: #5F5E5A;
+    --text-tertiary: #888780;
+    --border: #E0DED7;
+    --border-strong: #C4C2BA;
+    --radius-sm: 6px;
+    --radius-md: 10px;
+    --radius-lg: 14px;
+    --radius-xl: 18px;
+    font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+  }
+
+  body { background: var(--gray-50); color: var(--text-primary); min-height: 100vh; }
+
+  .topbar {
+    background: var(--green-800); padding: 14px 24px;
+    display: flex; align-items: center; gap: 14px;
+    position: sticky; top: 0; z-index: 100;
+  }
+  .topbar-icon {
+    width: 38px; height: 38px; background: var(--green-500);
+    border-radius: var(--radius-md);
+    display: flex; align-items: center; justify-content: center; flex-shrink: 0;
+  }
+  .topbar-icon svg { width: 20px; height: 20px; stroke: var(--green-50); fill: none; stroke-width: 2; stroke-linecap: round; }
+  .topbar-title { color: #fff; font-size: 16px; font-weight: 600; letter-spacing: -0.01em; }
+  .topbar-sub { color: var(--green-100); font-size: 12px; margin-top: 1px; }
+  .topbar-badge {
+    margin-left: auto; background: var(--green-700); color: var(--green-100);
+    font-size: 11px; padding: 4px 10px; border-radius: 99px; letter-spacing: 0.03em;
+  }
+
+  .main { max-width: 780px; margin: 0 auto; padding: 32px 24px 80px; }
+
+  /* ── API Key Panel ── */
+  .key-panel {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: var(--radius-xl); padding: 24px; margin-bottom: 20px;
+  }
+  .key-panel-header { display: flex; align-items: center; gap: 10px; margin-bottom: 14px; }
+  .key-lock { font-size: 20px; }
+  .key-panel-title { font-size: 14px; font-weight: 600; color: var(--text-primary); }
+  .key-panel-sub { font-size: 12px; color: var(--text-tertiary); margin-top: 2px; }
+  .key-input-row { display: flex; gap: 10px; }
+  .key-input {
+    flex: 1; padding: 10px 14px; font-size: 13px;
+    border: 1px solid var(--border-strong); border-radius: var(--radius-md);
+    background: var(--surface-alt); color: var(--text-primary);
+    font-family: 'Courier New', monospace; letter-spacing: 0.02em;
+    outline: none; transition: border-color 0.15s;
+  }
+  .key-input:focus { border-color: var(--green-500); }
+  .key-input::placeholder { color: var(--text-tertiary); letter-spacing: 0; font-family: inherit; }
+  .key-save-btn {
+    padding: 10px 18px; background: var(--green-700); color: #fff;
+    border: none; border-radius: var(--radius-md); font-size: 13px; font-weight: 600;
+    cursor: pointer; white-space: nowrap; transition: background 0.15s;
+  }
+  .key-save-btn:hover { background: var(--green-800); }
+  .key-status {
+    margin-top: 10px; font-size: 12px; padding: 8px 12px;
+    border-radius: var(--radius-sm); display: none;
+  }
+  .key-status.ok { display: block; background: var(--green-50); color: var(--green-800); border: 1px solid var(--green-100); }
+  .key-status.err { display: block; background: var(--red-50); color: var(--red-600); border: 1px solid var(--red-100); }
+
+  /* ── Upload panel ── */
+  .panel {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: var(--radius-xl); padding: 28px; margin-bottom: 20px;
+  }
+  .panel-title { font-size: 13px; font-weight: 600; color: var(--text-tertiary); text-transform: uppercase; letter-spacing: 0.06em; margin-bottom: 16px; }
+  .panel.locked { opacity: 0.45; pointer-events: none; user-select: none; }
+
+  .drop-zone {
+    border: 2px dashed var(--border-strong); border-radius: var(--radius-lg);
+    padding: 40px 24px; text-align: center; cursor: pointer;
+    transition: border-color 0.15s, background 0.15s;
+    position: relative; background: var(--surface-alt);
+  }
+  .drop-zone:hover, .drop-zone.drag { border-color: var(--green-500); background: var(--green-50); }
+  .drop-zone input { position: absolute; inset: 0; opacity: 0; cursor: pointer; }
+  .drop-icon { font-size: 36px; margin-bottom: 12px; display: block; }
+  .drop-main { font-size: 15px; color: var(--text-primary); font-weight: 500; }
+  .drop-main span { color: var(--green-700); text-decoration: underline; }
+  .drop-sub { font-size: 12px; color: var(--text-tertiary); margin-top: 6px; }
+
+  .file-row {
+    display: flex; align-items: center; gap: 12px;
+    padding: 12px 14px; background: var(--green-50);
+    border: 1px solid var(--green-100); border-radius: var(--radius-md); margin-top: 14px;
+  }
+  .file-row-icon { font-size: 24px; }
+  .file-row-info { flex: 1; }
+  .file-row-name { font-size: 13px; font-weight: 500; color: var(--green-800); }
+  .file-row-size { font-size: 11px; color: var(--green-700); margin-top: 2px; }
+  .file-row-remove {
+    background: none; border: none; cursor: pointer;
+    color: var(--green-700); font-size: 16px; padding: 4px 6px; border-radius: 4px; line-height: 1;
+  }
+  .file-row-remove:hover { background: var(--red-50); color: var(--red-400); }
+
+  .analyze-btn {
+    width: 100%; margin-top: 16px; padding: 13px 20px;
+    background: var(--green-700); color: #fff; border: none;
+    border-radius: var(--radius-md); font-size: 15px; font-weight: 600; cursor: pointer;
+    display: flex; align-items: center; justify-content: center; gap: 9px;
+    transition: background 0.15s, transform 0.1s; letter-spacing: -0.01em;
+  }
+  .analyze-btn:hover:not(:disabled) { background: var(--green-800); }
+  .analyze-btn:active:not(:disabled) { transform: scale(0.99); }
+  .analyze-btn:disabled { opacity: 0.45; cursor: not-allowed; }
+  .analyze-btn svg { width: 17px; height: 17px; }
+
+  .status-bar {
+    display: none; align-items: center; gap: 10px; padding: 12px 16px;
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: var(--radius-md); margin-bottom: 20px;
+    font-size: 13px; color: var(--text-secondary);
+  }
+  .status-bar.show { display: flex; }
+  .spinner {
+    width: 16px; height: 16px; flex-shrink: 0;
+    border: 2px solid var(--border); border-top-color: var(--green-500);
+    border-radius: 50%; animation: spin 0.7s linear infinite;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  .result-card {
+    background: var(--surface); border-radius: var(--radius-xl);
+    border: 2px solid var(--border); overflow: hidden;
+  }
+  .result-card.forged   { border-color: var(--red-400); }
+  .result-card.authentic { border-color: var(--green-500); }
+  .result-card.inconclusive { border-color: var(--amber-400); }
+
+  .verdict-banner { padding: 20px 24px; display: flex; align-items: center; gap: 14px; }
+  .verdict-banner.forged      { background: var(--red-50); }
+  .verdict-banner.authentic   { background: var(--green-50); }
+  .verdict-banner.inconclusive { background: var(--amber-50); }
+
+  .verdict-icon {
+    width: 46px; height: 46px; border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    flex-shrink: 0; font-size: 22px;
+  }
+  .verdict-icon.forged      { background: var(--red-400); }
+  .verdict-icon.authentic   { background: var(--green-500); }
+  .verdict-icon.inconclusive { background: var(--amber-400); }
+
+  .verdict-text h2 { font-size: 18px; font-weight: 700; }
+  .verdict-text h2.forged      { color: var(--red-600); }
+  .verdict-text h2.authentic   { color: var(--green-800); }
+  .verdict-text h2.inconclusive { color: var(--amber-600); }
+  .verdict-text p { font-size: 13px; color: var(--text-secondary); margin-top: 3px; }
+
+  .confidence-pill {
+    margin-left: auto; flex-shrink: 0;
+    font-size: 12px; font-weight: 600; padding: 5px 13px; border-radius: 99px;
+  }
+  .confidence-pill.forged      { background: var(--red-100); color: var(--red-800); }
+  .confidence-pill.authentic   { background: var(--green-100); color: var(--green-900); }
+  .confidence-pill.inconclusive { background: var(--amber-100); color: var(--amber-800); }
+
+  .summary-section { padding: 18px 24px; border-top: 1px solid var(--border); }
+  .summary-section p { font-size: 14px; line-height: 1.65; color: var(--text-secondary); }
+
+  .checks-section { padding: 0 24px 20px; }
+  .section-label {
+    font-size: 11px; font-weight: 700; text-transform: uppercase;
+    letter-spacing: 0.07em; color: var(--text-tertiary); margin-bottom: 10px; padding-top: 16px;
+  }
+
+  .check-list { display: flex; flex-direction: column; gap: 7px; }
+  .check-item {
+    display: flex; align-items: flex-start; gap: 10px; padding: 10px 13px;
+    border: 1px solid var(--border); border-radius: var(--radius-md); background: var(--surface-alt);
+  }
+  .check-item.fail { border-color: var(--red-100); background: var(--red-50); }
+  .check-item.warn { border-color: var(--amber-100); background: var(--amber-50); }
+  .check-item.pass { border-color: #C0DD97; background: #EAF3DE; }
+
+  .check-dot {
+    width: 20px; height: 20px; border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    flex-shrink: 0; font-size: 11px;
+  }
+  .check-dot.pass    { background: var(--green-500); color: #fff; }
+  .check-dot.fail    { background: var(--red-400); color: #fff; }
+  .check-dot.warn    { background: var(--amber-400); color: #fff; }
+  .check-dot.unknown { background: var(--gray-300); color: #fff; }
+
+  .check-content { flex: 1; }
+  .check-name { font-size: 13px; font-weight: 600; }
+  .check-name.pass    { color: #3B6D11; }
+  .check-name.fail    { color: var(--red-600); }
+  .check-name.warn    { color: var(--amber-600); }
+  .check-name.unknown { color: var(--text-secondary); }
+  .check-detail { font-size: 12px; color: var(--text-secondary); margin-top: 3px; line-height: 1.5; }
+  .check-item.fail .check-detail { color: var(--red-600); }
+  .check-item.warn .check-detail { color: var(--amber-600); }
+
+  .fields-section { padding: 16px 24px 24px; border-top: 1px solid var(--border); }
+  .fields-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 10px; }
+  .field-item { padding: 10px 13px; background: var(--surface-alt); border-radius: var(--radius-md); border: 1px solid var(--border); }
+  .field-label { font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.06em; color: var(--text-tertiary); }
+  .field-value { font-size: 13px; color: var(--text-primary); margin-top: 4px; font-weight: 500; word-break: break-all; }
+
+  .error-box {
+    padding: 14px 18px; border-radius: var(--radius-md);
+    background: var(--red-50); border: 1px solid var(--red-100);
+    color: var(--red-600); font-size: 13px; line-height: 1.6; margin-bottom: 20px;
+  }
+
+  .footer { text-align: center; padding: 32px 24px 16px; font-size: 12px; color: var(--text-tertiary); }
+  .footer a { color: var(--green-700); text-decoration: none; }
+</style>
 </head>
 <body>
+
 <div class="topbar">
   <div class="topbar-icon">
     <svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
@@ -18,352 +261,205 @@
     <div class="topbar-title">Sick Leave Authenticity Checker</div>
     <div class="topbar-sub">Seha / Saudi MOH — Forgery Detection</div>
   </div>
-  <span class="topbar-badge">AI-powered</span>
+  <span class="topbar-badge">Gemini 3 Powered</span>
 </div>
 
 <div class="main">
-  <div class="panel">
+
+  <div class="key-panel">
+    <div class="key-panel-header">
+      <span class="key-lock">🔑</span>
+      <div>
+        <div class="key-panel-title">Gemini API Key</div>
+        <div class="key-panel-sub">Using your provided key for analysis</div>
+      </div>
+    </div>
+    <div class="key-input-row">
+      <input class="key-input" type="password" id="apiKeyInput" value="AIzaSyAlm1Xdp-je850CVq11C00l90pu3kkIiaU" autocomplete="off" spellcheck="false">
+      <button class="key-save-btn" id="keySaveBtn">Save key</button>
+    </div>
+    <div class="key-status" id="keyStatus"></div>
+  </div>
+
+  <div class="panel locked" id="uploadPanel">
     <div class="panel-title">Upload document</div>
-    <div class="drop-zone" id="dropZone" tabindex="0" aria-label="Document file drop area">
-      <input type="file" id="fileInput" accept=".pdf,image/*" aria-label="Choose document for analysis">
-      <span class="drop-icon" aria-hidden="true">📋</span>
+    <div class="drop-zone" id="dropZone">
+      <input type="file" id="fileInput" accept=".pdf,image/*">
+      <span class="drop-icon">📋</span>
       <div class="drop-main">Drop sick leave file here, or <span>browse</span></div>
-      <div class="drop-sub">Accepts PDF, JPG, PNG, WEBP (max 10MB)</div>
+      <div class="drop-sub">Accepts PDF, JPG, PNG, WEBP</div>
     </div>
     <div id="fileRow" style="display:none;" class="file-row">
-      <span class="file-row-icon" id="fileIcon" aria-hidden="true">📄</span>
+      <span class="file-row-icon" id="fileIcon">📄</span>
       <div class="file-row-info">
         <div class="file-row-name" id="fileName"></div>
         <div class="file-row-size" id="fileSize"></div>
       </div>
-      <button class="file-row-remove" id="removeBtn" aria-label="Remove selected file">✕</button>
+      <button class="file-row-remove" id="removeBtn">✕</button>
     </div>
-    <button class="analyze-btn" id="analyzeBtn" aria-label="Analyze document for authenticity" disabled>
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" aria-hidden="true">
+    <button class="analyze-btn" id="analyzeBtn" disabled>
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round">
         <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
       </svg>
-      <span class="btn-text">Analyze document</span>
+      Analyze document
     </button>
   </div>
 
-  <div class="status-bar" id="statusBar" role="status" aria-live="polite">
-    <div class="spinner" aria-hidden="true"></div>
-    <span id="statusText">Ready.</span>
+  <div class="status-bar" id="statusBar">
+    <div class="spinner"></div>
+    <span id="statusText">Reading document...</span>
   </div>
 
-  <div class="error-box" id="errorBox" style="display:none;" role="alert"></div>
+  <div class="error-box" id="errorBox" style="display:none;"></div>
   <div id="resultArea"></div>
-</div>
 
-<div class="footer">
-  <strong>Privacy notice:</strong> Documents are analyzed by AI. Do not upload confidential or sensitive personal information.<br>
-  Verify documents at <a href="https://www.seha.sa/#/inquiries/slenquiry" target="_blank" rel="noopener">www.seha.sa/#/inquiries/slenquiry</a>
-  &nbsp;·&nbsp; Powered by Claude AI
 </div>
 
 <script>
-// -- Constants --
-const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB
-const ALLOWED_TYPES = ['pdf','jpg','jpeg','png','webp'];
+const SYSTEM_PROMPT = `Analyze Saudi Arabian Seha (صحة) sick leave report authentication. Detect signs of forgery.
 
-// *For a production setup, use your own backend API, not the frontend direct Claude call here!*
-const USE_LOCAL_BACKEND = false; // Set to true when backend ready, see below
+A genuine report must have:
+1. QR code linking to https://www.seha.sa/#/inquiries/slenquiry
+2. ID: PSL + 14 digits
+3. Seha logo & KSA header
+4. National Health Information Centre logo (bottom right)
+5. Hospital info & 16-digit license starting with 38 (bottom left)
+6. Consistent dates: admission <= discharge <= issue date
+7. Print timestamp at bottom left
 
-// -- DOM Elements --
-const dropZone   = document.getElementById('dropZone');
-const fileInput  = document.getElementById('fileInput');
-const fileRow    = document.getElementById('fileRow');
-const fileIcon   = document.getElementById('fileIcon');
-const fileName   = document.getElementById('fileName');
-const fileSizeEl = document.getElementById('fileSize');
-const removeBtn  = document.getElementById('removeBtn');
-const analyzeBtn = document.getElementById('analyzeBtn');
-const statusBar  = document.getElementById('statusBar');
-const statusText = document.getElementById('statusText');
-const errorBox   = document.getElementById('errorBox');
-const resultArea = document.getElementById('resultArea');
+Return ONLY JSON:
+{
+  "verdict": "FORGED|AUTHENTIC|INCONCLUSIVE",
+  "confidence": "High|Medium|Low",
+  "summary": "2-3 sentences",
+  "checks": [
+    {"name": "Check Name", "status": "PASS|FAIL|WARN|UNKNOWN", "detail": "findings"}
+  ],
+  "extractedFields": {
+    "leaveId": "", "patientName": "", "nationalId": "", "nationality": "", 
+    "hospital": "", "licenseNumber": "", "practitioner": "", 
+    "admissionDate": "", "dischargeDate": "", "issueDate": "", 
+    "printTimestamp": "", "employer": ""
+  }
+}`;
+
+const KEY_STORAGE = 'seha_gemini_key_v3';
+let apiKey = localStorage.getItem(KEY_STORAGE) || document.getElementById('apiKeyInput').value;
+
+const apiKeyInput = document.getElementById('apiKeyInput');
+const keySaveBtn = document.getElementById('keySaveBtn');
+const keyStatus = document.getElementById('keyStatus');
+const uploadPanel = document.getElementById('uploadPanel');
+
+function applyKeyState() {
+  if (apiKey && apiKey.startsWith('AIzaSy')) {
+    uploadPanel.classList.remove('locked');
+    apiKeyInput.value = apiKey;
+    keyStatus.className = 'key-status ok';
+    keyStatus.textContent = '✓ Ready for analysis';
+    keyStatus.style.display = 'block';
+  } else {
+    uploadPanel.classList.add('locked');
+  }
+}
+
+keySaveBtn.addEventListener('click', () => {
+  apiKey = apiKeyInput.value.trim();
+  localStorage.setItem(KEY_STORAGE, apiKey);
+  applyKeyState();
+});
+
+applyKeyState();
 
 let fileData = null;
-
-// -- Helpers --
-function fmtSize(b) {
-  if (b < 1024) return b + ' B';
-  if (b < 1048576) return (b/1024).toFixed(1) + ' KB';
-  return (b/1048576).toFixed(1) + ' MB';
-}
-
-function setStatus(text) {
-  statusText.textContent = text;
-  statusBar.classList.add('show');
-}
-
-function clearStatus() {
-  statusBar.classList.remove('show');
-}
-
-function clearResults() {
-  resultArea.innerHTML = '';
-  errorBox.style.display = 'none';
-  clearStatus();
-}
-
-function showError(msg) {
-  errorBox.textContent = `⚠️ ${msg}`;
-  errorBox.style.display = 'block';
-}
-
-function validateFile(file) {
-  const ext = file.name.split('.').pop().toLowerCase();
-  if (!ALLOWED_TYPES.includes(ext)) {
-    showError('Unsupported file type. Only PDF, JPG, PNG, or WEBP allowed.');
-    return false;
-  }
-  if (file.size > MAX_FILE_SIZE) {
-    showError('File too large (max 10MB).');
-    return false;
-  }
-  return true;
-}
+const dropZone = document.getElementById('dropZone');
+const fileInput = document.getElementById('fileInput');
+const fileRow = document.getElementById('fileRow');
+const fileName = document.getElementById('fileName');
+const fileSizeEl = document.getElementById('fileSize');
+const analyzeBtn = document.getElementById('analyzeBtn');
+const statusBar = document.getElementById('statusBar');
+const errorBox = document.getElementById('errorBox');
+const resultArea = document.getElementById('resultArea');
 
 function loadFile(file) {
-  if (!validateFile(file)) {
-    fileInput.value = '';
-    return;
-  }
-  const ext = file.name.split('.').pop().toLowerCase();
-  fileIcon.textContent = ext === 'pdf' ? '📄' : '🖼️';
   fileName.textContent = file.name;
-  fileSizeEl.textContent = fmtSize(file.size);
+  fileSizeEl.textContent = (file.size/1024).toFixed(1) + ' KB';
   fileRow.style.display = 'flex';
   analyzeBtn.disabled = false;
-  clearResults();
-
   const reader = new FileReader();
   reader.onload = e => {
-    const dataUrl = e.target.result;
-    const base64 = dataUrl.split(',')[1];
-    let mediaType = 'image/jpeg';
-    if (ext === 'pdf') mediaType = 'application/pdf';
-    else if (ext === 'png') mediaType = 'image/png';
-    else if (ext === 'webp') mediaType = 'image/webp';
-    else if (ext === 'jpg' || ext === 'jpeg') mediaType = 'image/jpeg';
-    fileData = { base64, mediaType, ext };
+    fileData = { 
+        base64: e.target.result.split(',')[1], 
+        mediaType: file.type || 'image/jpeg' 
+    };
   };
-  reader.onerror = () => showError('Failed to read file.');
   reader.readAsDataURL(file);
 }
 
-function statusToClass(s) {
-  s = (s || '').toUpperCase();
-  if (s === 'PASS') return 'pass';
-  if (s === 'FAIL') return 'fail';
-  if (s === 'WARN') return 'warn';
-  return 'unknown';
-}
-function statusIcon(s) {
-  if (s === 'pass') return '✓';
-  if (s === 'fail') return '✕';
-  if (s === 'warn') return '!';
-  return '?';
-}
+fileInput.addEventListener('change', e => { if (e.target.files[0]) loadFile(e.target.files[0]); });
 
-// -- Accessibility & UX --
-function setFocusOn(element) {
-  if (element && typeof element.focus === 'function') element.focus();
-}
-
-// -- Event Listeners --
-fileInput.addEventListener('change', e => {
-  if (e.target.files[0]) loadFile(e.target.files[0]);
-  setFocusOn(removeBtn);
-});
-dropZone.addEventListener('dragover', e => { e.preventDefault(); dropZone.classList.add('drag'); });
-dropZone.addEventListener('dragleave', () => dropZone.classList.remove('drag'));
-dropZone.addEventListener('drop', e => {
-  e.preventDefault(); dropZone.classList.remove('drag');
-  if (e.dataTransfer.files[0]) loadFile(e.dataTransfer.files[0]);
-  setFocusOn(removeBtn);
-});
-dropZone.addEventListener('keydown', e => {
-  if (e.key === 'Enter' || e.key === ' ') fileInput.click();
-});
-removeBtn.addEventListener('click', () => {
-  fileData = null;
-  fileRow.style.display = 'none';
+analyzeBtn.addEventListener('click', async () => {
   analyzeBtn.disabled = true;
-  fileInput.value = '';
-  clearResults();
-  setFocusOn(fileInput);
+  errorBox.style.display = 'none';
+  statusBar.classList.add('show');
+  
+  try {
+    const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-3-flash-preview:generateContent?key=${apiKey}`;
+    
+    const response = await fetch(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        systemInstruction: { parts: [{ text: SYSTEM_PROMPT }] },
+        generationConfig: { responseMimeType: "application/json" },
+        contents: [{
+          parts: [
+            { inlineData: { mimeType: fileData.mediaType, data: fileData.base64 } },
+            { text: "Analyze this document for authenticity." }
+          ]
+        }]
+      })
+    });
+
+    const data = await response.json();
+    if (!response.ok) throw new Error(data.error?.message || "API Error");
+    
+    const result = JSON.parse(data.candidates[0].content.parts[0].text);
+    renderResult(result);
+  } catch (err) {
+    errorBox.textContent = "Error: " + err.message;
+    errorBox.style.display = 'block';
+  } finally {
+    analyzeBtn.disabled = false;
+    statusBar.classList.remove('show');
+  }
 });
 
-// -- Result Rendering --
 function renderResult(data) {
-  const vRaw = (data.verdict || 'inconclusive').toLowerCase();
-  const v = ['forged','authentic','inconclusive'].includes(vRaw) ? vRaw : 'inconclusive';
-  const vLabel = v === 'forged' ? 'Suspected Forgery' : v === 'authentic' ? 'Appears Authentic' : 'Inconclusive';
-  const vEmoji = v === 'forged' ? '🚨' : v === 'authentic' ? '✅' : '⚠️';
-  const vConf = data.confidence || 'Medium';
-
-  const checksHtml = (data.checks || []).map(c => {
-    const sc = statusToClass(c.status);
-    return `<div class="check-item ${sc}">
-      <div class="check-dot ${sc}" aria-label="${c.status}">${statusIcon(sc)}</div>
+  const v = (data.verdict || 'inconclusive').toLowerCase();
+  const checks = (data.checks || []).map(c => `
+    <div class="check-item ${c.status.toLowerCase()}">
+      <div class="check-dot ${c.status.toLowerCase()}">${c.status === 'PASS' ? '✓' : '✕'}</div>
       <div class="check-content">
-        <div class="check-name ${sc}">${c.name || ''}</div>
-        ${c.detail ? `<div class="check-detail">${c.detail}</div>` : ''}
+        <div class="check-name">${c.name}</div>
+        <div class="check-detail">${c.detail}</div>
       </div>
-    </div>`;
-  }).join('');
-
-  const f = data.extractedFields || {};
-  const pairs = [
-    ['Leave ID', f.leaveId], ['Patient name', f.patientName],
-    ['National ID', f.nationalId], ['Nationality', f.nationality],
-    ['Hospital', f.hospital], ['License no.', f.licenseNumber],
-    ['Practitioner', f.practitioner], ['Admission', f.admissionDate],
-    ['Discharge', f.dischargeDate], ['Issue date', f.issueDate],
-    ['Print time', f.printTimestamp], ['Employer', f.employer]
-  ].filter(([, val]) => val && val.trim() !== '' && val !== 'N/A');
-
-  const fieldsHtml = pairs.length ? `
-    <div class="fields-section">
-      <div class="section-label">Extracted document data</div>
-      <div class="fields-grid">
-        ${pairs.map(([l, v]) => `<div class="field-item"><div class="field-label">${l}</div><div class="field-value">${v}</div></div>`).join('')}
-      </div>
-    </div>` : '';
+    </div>
+  `).join('');
 
   resultArea.innerHTML = `
     <div class="result-card ${v}">
       <div class="verdict-banner ${v}">
-        <div class="verdict-icon ${v}" aria-label="${vLabel}">${vEmoji}</div>
         <div class="verdict-text">
-          <h2 class="${v}">${vLabel}</h2>
-          <p>${vConf} confidence &middot; AI analysis</p>
+          <h2 class="${v}">${data.verdict}</h2>
+          <p>${data.confidence} Confidence</p>
         </div>
-        <span class="confidence-pill ${v}">${vConf}</span>
       </div>
-      <div class="summary-section">
-        <p>${data.summary || ''}</p>
-      </div>
-      <div class="checks-section">
-        <div class="section-label">Checks performed</div>
-        <div class="check-list">${checksHtml}</div>
-      </div>
-      ${fieldsHtml}
+      <div class="summary-section"><p>${data.summary}</p></div>
+      <div class="checks-section"><div class="check-list">${checks}</div></div>
     </div>`;
 }
-
-// -- Claude Prompt --
-const SYSTEM_PROMPT = `
-You are a forensic document analyst specializing in Saudi Arabian Seha (صحة) sick leave report authentication. 
-Analyze uploaded sick leave reports and detect signs of forgery.
-
-A genuine Seha sick leave report (تقرير إجازة مرضية) must have ALL of these:
-1. QR code that links to https://www.seha.sa/#/inquiries/slenquiry — MOST CRITICAL check
-2. Leave ID in format PSL followed by 14 digits (e.g. PSL25080724757)
-3. Seha logo (صحة / Seha) and Kingdom of Saudi Arabia header
-4. National Health Information Centre logo at bottom right
-5. Hospital name and license number at bottom left (رقم الترخيص), 16-digit format starting with 38
-6. Verification text: www.seha.sa/#/inquiries/slenquiry
-7. Practitioner name and position (General/طبيب عام or specialist)
-8. Logically consistent dates: admission ≤ discharge ≤ issue date
-9. Leave duration matches date range
-10. Print timestamp at bottom left (time + date PDF was generated)
-
-Common forgery signs:
-- QR code missing, blurry, or wrong URL
-- Dates inconsistent or in the future relative to issue
-- Print date much later than issue date (>7 days gap is suspicious)
-- Employer field filled in (genuine documents leave it blank)
-- Inconsistent fonts or obvious text edits
-- Leave ID missing or wrong format
-- Hospital license number wrong format
-- Missing National Health Information Centre branding
-- Text that appears overlaid or different color/font from rest of document
-
-Respond ONLY in this exact JSON (no markdown fences, no extra text):
-{
-  "verdict": "FORGED",
-  "confidence": "High",
-  "summary": "Brief 2-3 sentence finding summary",
-  "checks": [
-    {"name": "Check name", "status": "PASS", "detail": "What was found"}
-  ],
-  "extractedFields": {
-    "leaveId": "",
-    "patientName": "",
-    "nationalId": "",
-    "nationality": "",
-    "hospital": "",
-    "licenseNumber": "",
-    "practitioner": "",
-    "admissionDate": "",
-    "dischargeDate": "",
-    "issueDate": "",
-    "printTimestamp": "",
-    "employer": ""
-  }
-}
-
-Verdict options: FORGED | AUTHENTIC | INCONCLUSIVE
-Status options: PASS | FAIL | WARN | UNKNOWN
-Always include these 10 checks in order: QR Code Destination, Leave ID Format, Document Structure, Date Consistency, Leave Duration Match, Hospital License Number, Verification URL, Print Timestamp, Verification Branding, Employer, Practitioner Name/Role.
-`;
-
-// -- Analysis Handler --
-analyzeBtn.addEventListener('click', async () => {
-  if (!fileData) return;
-  clearResults();
-  analyzeBtn.disabled = true;
-  analyzeBtn.querySelector('.btn-text').textContent = 'Analyzing...';
-  setStatus('Preparing document for analysis...');
-
-  // --- Format Content as Claude expects ---
-  const contentBlock = fileData.mediaType === 'application/pdf'
-    ? { type: 'document', source: { type: 'base64', media_type: 'application/pdf', data: fileData.base64 } }
-    : { type: 'image', source: { type: 'base64', media_type: fileData.mediaType, data: fileData.base64 } };
-
-  // --- Secure Backend Pattern (RECOMMENDED) ---
-  if (USE_LOCAL_BACKEND) {
-    // Exchange this for your own backend endpoint.
-    try {
-      setStatus('Sending document to server...');
-      const resp = await fetch('/api/analyze', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ fileData, systemPrompt: SYSTEM_PROMPT })
-      });
-      if (!resp.ok) throw new Error('Server error ' + resp.status);
-      setStatus('Processing results...');
-      const parsed = await resp.json();
-      clearStatus();
-      renderResult(parsed);
-    } catch (err) {
-      clearStatus();
-      showError('Analysis failed. Please try again.');
-    } finally {
-      analyzeBtn.disabled = false;
-      analyzeBtn.querySelector('.btn-text').textContent = 'Analyze document';
-    }
-    return;
-  }
-
-  // --- Direct Claude API (INSECURE DEMO ONLY) ---
-  try {
-    setStatus('Sending document to AI for analysis...');
-    // === IMPORTANT: this is NOT secure for production! ===
-    // Real code should never call Anthropic API from browser.
-    const resp = await fetch('https://api.anthropic.com/v1/messages', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        // In production, do NOT expose your Anthropic API key.
-        // 'x-api-key': 'YOUR_ANTHROPIC_KEY',
-      },
-      body: JSON.stringify({
-        model: 'claude-sonnet-4-20250514',
-        max_tokens: 1800,
-        system: SYSTEM_PROMPT,
-        messages](#)`
-
+</script>
+</body>
+</html>
