@@ -4,293 +4,190 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Seha Sick Leave Authenticity Checker</title>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/tesseract.js/5.0.4/tesseract.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jsqr/1.4.0/jsQR.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/exif-js/2.3.0/exif.js"></script>
+
 <style>
-  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --g800:#085041;--g700:#0F6E56;--g500:#1D9E75;--g100:#9FE1CB;--g50:#E1F5EE;
+  --r600:#A32D2D;--r400:#E24B4A;--r100:#F7C1C1;--r50:#FCEBEB;
+  --a600:#854F0B;--a400:#BA7517;--a100:#FAC775;--a50:#FAEEDA;
+  --sur:#fff;--alt:#F8F7F4;--tp:#1A1A1A;--ts:#5F5E5A;--tt:#888780;
+  --bor:#E0DED7;--bors:#C4C2BA;
+  font-family:'Segoe UI',system-ui,sans-serif;
+}
+body{background:#F5F4F0;color:var(--tp);min-height:100vh}
 
-  :root {
-    --green-900: #04342C;
-    --green-800: #085041;
-    --green-700: #0F6E56;
-    --green-500: #1D9E75;
-    --green-300: #5DCAA8;
-    --green-100: #9FE1CB;
-    --green-50:  #E1F5EE;
-    --red-800: #791F1F;
-    --red-600: #A32D2D;
-    --red-400: #E24B4A;
-    --red-100: #F7C1C1;
-    --red-50:  #FCEBEB;
-    --amber-800: #633806;
-    --amber-600: #854F0B;
-    --amber-400: #BA7517;
-    --amber-100: #FAC775;
-    --amber-50:  #FAEEDA;
-    --gray-900: #1A1A1A;
-    --gray-700: #444441;
-    --gray-500: #888780;
-    --gray-300: #B4B2A9;
-    --gray-100: #D3D1C7;
-    --gray-50:  #F5F4F0;
-    --surface: #FFFFFF;
-    --surface-alt: #F8F7F4;
-    --text-primary: #1A1A1A;
-    --text-secondary: #5F5E5A;
-    --text-tertiary: #888780;
-    --border: #E0DED7;
-    --border-strong: #C4C2BA;
-    --radius-sm: 6px;
-    --radius-md: 10px;
-    --radius-lg: 14px;
-    --radius-xl: 18px;
-    font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
-  }
+.topbar{background:var(--g800);padding:14px 24px;display:flex;align-items:center;gap:14px;position:sticky;top:0;z-index:100}
+.tb-icon{width:38px;height:38px;background:var(--g500);border-radius:10px;display:flex;align-items:center;justify-content:center;flex-shrink:0}
+.tb-icon svg{width:20px;height:20px;stroke:#E1F5EE;fill:none;stroke-width:2;stroke-linecap:round}
+.tb-title{color:#fff;font-size:16px;font-weight:600}
+.tb-sub{color:var(--g100);font-size:12px;margin-top:1px}
+.tb-badge{margin-left:auto;background:var(--g700);color:var(--g100);font-size:11px;padding:4px 10px;border-radius:99px}
 
-  body { background: var(--gray-50); color: var(--text-primary); min-height: 100vh; }
+.main{max-width:800px;margin:0 auto;padding:28px 20px 80px}
 
-  .topbar {
-    background: var(--green-800); padding: 14px 24px;
-    display: flex; align-items: center; gap: 14px;
-    position: sticky; top: 0; z-index: 100;
-  }
-  .topbar-icon {
-    width: 38px; height: 38px; background: var(--green-500);
-    border-radius: var(--radius-md);
-    display: flex; align-items: center; justify-content: center; flex-shrink: 0;
-  }
-  .topbar-icon svg { width: 20px; height: 20px; stroke: var(--green-50); fill: none; stroke-width: 2; stroke-linecap: round; }
-  .topbar-title { color: #fff; font-size: 16px; font-weight: 600; letter-spacing: -0.01em; }
-  .topbar-sub { color: var(--green-100); font-size: 12px; margin-top: 1px; }
-  .topbar-badge {
-    margin-left: auto; background: var(--green-700); color: var(--green-100);
-    font-size: 11px; padding: 4px 10px; border-radius: 99px; letter-spacing: 0.03em;
-  }
+.panel{background:var(--sur);border:1px solid var(--bor);border-radius:18px;padding:24px;margin-bottom:18px}
+.panel-title{font-size:12px;font-weight:700;color:var(--tt);text-transform:uppercase;letter-spacing:.06em;margin-bottom:14px}
 
-  .main { max-width: 780px; margin: 0 auto; padding: 32px 24px 80px; }
+.info-strip{background:var(--g50);border:1px solid var(--g100);border-radius:10px;padding:12px 16px;margin-bottom:18px;font-size:12px;color:var(--g800);line-height:1.6}
 
-  /* ── API Key Panel ── */
-  .key-panel {
-    background: var(--surface); border: 1px solid var(--border);
-    border-radius: var(--radius-xl); padding: 24px; margin-bottom: 20px;
-  }
-  .key-panel-header { display: flex; align-items: center; gap: 10px; margin-bottom: 14px; }
-  .key-lock { font-size: 20px; }
-  .key-panel-title { font-size: 14px; font-weight: 600; color: var(--text-primary); }
-  .key-panel-sub { font-size: 12px; color: var(--text-tertiary); margin-top: 2px; }
-  .key-input-row { display: flex; gap: 10px; }
-  .key-input {
-    flex: 1; padding: 10px 14px; font-size: 13px;
-    border: 1px solid var(--border-strong); border-radius: var(--radius-md);
-    background: var(--surface-alt); color: var(--text-primary);
-    font-family: 'Courier New', monospace; letter-spacing: 0.02em;
-    outline: none; transition: border-color 0.15s;
-  }
-  .key-input:focus { border-color: var(--green-500); }
-  .key-input::placeholder { color: var(--text-tertiary); letter-spacing: 0; font-family: inherit; }
-  .key-save-btn {
-    padding: 10px 18px; background: var(--green-700); color: #fff;
-    border: none; border-radius: var(--radius-md); font-size: 13px; font-weight: 600;
-    cursor: pointer; white-space: nowrap; transition: background 0.15s;
-  }
-  .key-save-btn:hover { background: var(--green-800); }
-  .key-status {
-    margin-top: 10px; font-size: 12px; padding: 8px 12px;
-    border-radius: var(--radius-sm); display: none;
-  }
-  .key-status.ok { display: block; background: var(--green-50); color: var(--green-800); border: 1px solid var(--green-100); }
-  .key-status.err { display: block; background: var(--red-50); color: var(--red-600); border: 1px solid var(--red-100); }
+.drop-zone{border:2px dashed var(--bors);border-radius:14px;padding:36px 24px;text-align:center;cursor:pointer;transition:.15s;position:relative;background:var(--alt)}
+.drop-zone:hover,.drop-zone.drag{border-color:var(--g500);background:var(--g50)}
+.drop-zone input{position:absolute;inset:0;opacity:0;cursor:pointer}
+.drop-icon{font-size:34px;display:block;margin-bottom:10px}
+.drop-main{font-size:15px;font-weight:500}
+.drop-main span{color:var(--g700);text-decoration:underline}
+.drop-sub{font-size:12px;color:var(--tt);margin-top:5px}
 
-  /* ── Upload panel ── */
-  .panel {
-    background: var(--surface); border: 1px solid var(--border);
-    border-radius: var(--radius-xl); padding: 28px; margin-bottom: 20px;
-  }
-  .panel-title { font-size: 13px; font-weight: 600; color: var(--text-tertiary); text-transform: uppercase; letter-spacing: 0.06em; margin-bottom: 16px; }
-  .panel.locked { opacity: 0.45; pointer-events: none; user-select: none; }
+.file-row{display:flex;align-items:center;gap:12px;padding:11px 14px;background:var(--g50);border:1px solid var(--g100);border-radius:10px;margin-top:12px}
+.file-row-info{flex:1}
+.file-row-name{font-size:13px;font-weight:500;color:var(--g800)}
+.file-row-size{font-size:11px;color:var(--g700);margin-top:2px}
+.file-row-remove{background:none;border:none;cursor:pointer;color:var(--g700);font-size:16px;padding:4px 6px;border-radius:4px}
+.file-row-remove:hover{background:var(--r50);color:var(--r400)}
 
-  .drop-zone {
-    border: 2px dashed var(--border-strong); border-radius: var(--radius-lg);
-    padding: 40px 24px; text-align: center; cursor: pointer;
-    transition: border-color 0.15s, background 0.15s;
-    position: relative; background: var(--surface-alt);
-  }
-  .drop-zone:hover, .drop-zone.drag { border-color: var(--green-500); background: var(--green-50); }
-  .drop-zone input { position: absolute; inset: 0; opacity: 0; cursor: pointer; }
-  .drop-icon { font-size: 36px; margin-bottom: 12px; display: block; }
-  .drop-main { font-size: 15px; color: var(--text-primary); font-weight: 500; }
-  .drop-main span { color: var(--green-700); text-decoration: underline; }
-  .drop-sub { font-size: 12px; color: var(--text-tertiary); margin-top: 6px; }
+.analyze-btn{width:100%;margin-top:14px;padding:13px 20px;background:var(--g700);color:#fff;border:none;border-radius:10px;font-size:15px;font-weight:600;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:9px;transition:.15s}
+.analyze-btn:hover:not(:disabled){background:var(--g800)}
+.analyze-btn:disabled{opacity:.4;cursor:not-allowed}
 
-  .file-row {
-    display: flex; align-items: center; gap: 12px;
-    padding: 12px 14px; background: var(--green-50);
-    border: 1px solid var(--green-100); border-radius: var(--radius-md); margin-top: 14px;
-  }
-  .file-row-icon { font-size: 24px; }
-  .file-row-info { flex: 1; }
-  .file-row-name { font-size: 13px; font-weight: 500; color: var(--green-800); }
-  .file-row-size { font-size: 11px; color: var(--green-700); margin-top: 2px; }
-  .file-row-remove {
-    background: none; border: none; cursor: pointer;
-    color: var(--green-700); font-size: 16px; padding: 4px 6px; border-radius: 4px; line-height: 1;
-  }
-  .file-row-remove:hover { background: var(--red-50); color: var(--red-400); }
+/* progress */
+.progress-panel{background:var(--sur);border:1px solid var(--bor);border-radius:18px;padding:20px 24px;margin-bottom:18px;display:none}
+.progress-panel.show{display:block}
+.prog-title{font-size:13px;font-weight:600;margin-bottom:14px}
+.prog-steps{display:flex;flex-direction:column;gap:8px}
+.prog-step{display:flex;align-items:center;gap:10px;font-size:13px;color:var(--tt)}
+.prog-step.active{color:var(--g700);font-weight:500}
+.prog-step.done{color:#3B6D11}
+.prog-step.err{color:var(--r600)}
+.step-dot{width:20px;height:20px;border-radius:50%;flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:700}
+.step-dot.idle{background:var(--alt);border:1.5px solid var(--bors)}
+.step-dot.spin{border:2px solid var(--bors);border-top-color:var(--g500);animation:spin .7s linear infinite}
+.step-dot.done{background:var(--g500);color:#fff}
+.step-dot.fail{background:var(--r400);color:#fff}
+.step-dot.skip{background:var(--a400);color:#fff}
+@keyframes spin{to{transform:rotate(360deg)}}
 
-  .analyze-btn {
-    width: 100%; margin-top: 16px; padding: 13px 20px;
-    background: var(--green-700); color: #fff; border: none;
-    border-radius: var(--radius-md); font-size: 15px; font-weight: 600; cursor: pointer;
-    display: flex; align-items: center; justify-content: center; gap: 9px;
-    transition: background 0.15s, transform 0.1s; letter-spacing: -0.01em;
-  }
-  .analyze-btn:hover:not(:disabled) { background: var(--green-800); }
-  .analyze-btn:active:not(:disabled) { transform: scale(0.99); }
-  .analyze-btn:disabled { opacity: 0.45; cursor: not-allowed; }
-  .analyze-btn svg { width: 17px; height: 17px; }
+/* result */
+.result-card{background:var(--sur);border-radius:18px;border:2px solid var(--bor);overflow:hidden}
+.result-card.forged{border-color:var(--r400)}
+.result-card.authentic{border-color:var(--g500)}
+.result-card.inconclusive{border-color:var(--a400)}
 
-  .status-bar {
-    display: none; align-items: center; gap: 10px; padding: 12px 16px;
-    background: var(--surface); border: 1px solid var(--border);
-    border-radius: var(--radius-md); margin-bottom: 20px;
-    font-size: 13px; color: var(--text-secondary);
-  }
-  .status-bar.show { display: flex; }
-  .spinner {
-    width: 16px; height: 16px; flex-shrink: 0;
-    border: 2px solid var(--border); border-top-color: var(--green-500);
-    border-radius: 50%; animation: spin 0.7s linear infinite;
-  }
-  @keyframes spin { to { transform: rotate(360deg); } }
+.verdict-banner{padding:20px 24px;display:flex;align-items:center;gap:14px}
+.verdict-banner.forged{background:var(--r50)}
+.verdict-banner.authentic{background:var(--g50)}
+.verdict-banner.inconclusive{background:var(--a50)}
 
-  .result-card {
-    background: var(--surface); border-radius: var(--radius-xl);
-    border: 2px solid var(--border); overflow: hidden;
-  }
-  .result-card.forged   { border-color: var(--red-400); }
-  .result-card.authentic { border-color: var(--green-500); }
-  .result-card.inconclusive { border-color: var(--amber-400); }
+.verdict-icon{width:48px;height:48px;border-radius:50%;display:flex;align-items:center;justify-content:center;flex-shrink:0;font-size:22px}
+.verdict-icon.forged{background:var(--r400)}
+.verdict-icon.authentic{background:var(--g500)}
+.verdict-icon.inconclusive{background:var(--a400)}
 
-  .verdict-banner { padding: 20px 24px; display: flex; align-items: center; gap: 14px; }
-  .verdict-banner.forged      { background: var(--red-50); }
-  .verdict-banner.authentic   { background: var(--green-50); }
-  .verdict-banner.inconclusive { background: var(--amber-50); }
+.verdict-text h2{font-size:18px;font-weight:700}
+.verdict-text h2.forged{color:var(--r600)}
+.verdict-text h2.authentic{color:var(--g800)}
+.verdict-text h2.inconclusive{color:var(--a600)}
+.verdict-text p{font-size:12px;color:var(--ts);margin-top:3px}
 
-  .verdict-icon {
-    width: 46px; height: 46px; border-radius: 50%;
-    display: flex; align-items: center; justify-content: center;
-    flex-shrink: 0; font-size: 22px;
-  }
-  .verdict-icon.forged      { background: var(--red-400); }
-  .verdict-icon.authentic   { background: var(--green-500); }
-  .verdict-icon.inconclusive { background: var(--amber-400); }
+.score-wrap{margin-left:auto;flex-shrink:0;text-align:center;min-width:70px}
+.score-num{font-size:20px;font-weight:700;line-height:1}
+.score-num.forged{color:var(--r600)}
+.score-num.authentic{color:var(--g800)}
+.score-num.inconclusive{color:var(--a600)}
+.score-label{font-size:10px;color:var(--tt);margin-top:3px}
 
-  .verdict-text h2 { font-size: 18px; font-weight: 700; }
-  .verdict-text h2.forged      { color: var(--red-600); }
-  .verdict-text h2.authentic   { color: var(--green-800); }
-  .verdict-text h2.inconclusive { color: var(--amber-600); }
-  .verdict-text p { font-size: 13px; color: var(--text-secondary); margin-top: 3px; }
+.summary-section{padding:16px 24px;border-top:1px solid var(--bor)}
+.summary-section p{font-size:14px;line-height:1.65;color:var(--ts)}
 
-  .confidence-pill {
-    margin-left: auto; flex-shrink: 0;
-    font-size: 12px; font-weight: 600; padding: 5px 13px; border-radius: 99px;
-  }
-  .confidence-pill.forged      { background: var(--red-100); color: var(--red-800); }
-  .confidence-pill.authentic   { background: var(--green-100); color: var(--green-900); }
-  .confidence-pill.inconclusive { background: var(--amber-100); color: var(--amber-800); }
+.checks-section{padding:0 24px 20px}
+.section-label{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:var(--tt);margin-bottom:10px;padding-top:14px}
 
-  .summary-section { padding: 18px 24px; border-top: 1px solid var(--border); }
-  .summary-section p { font-size: 14px; line-height: 1.65; color: var(--text-secondary); }
+.check-list{display:flex;flex-direction:column;gap:6px}
+.check-item{display:flex;align-items:flex-start;gap:10px;padding:10px 13px;border:1px solid var(--bor);border-radius:10px;background:var(--alt)}
+.check-item.fail{border-color:var(--r100);background:var(--r50)}
+.check-item.warn{border-color:var(--a100);background:var(--a50)}
+.check-item.pass{border-color:#C0DD97;background:#EAF3DE}
 
-  .checks-section { padding: 0 24px 20px; }
-  .section-label {
-    font-size: 11px; font-weight: 700; text-transform: uppercase;
-    letter-spacing: 0.07em; color: var(--text-tertiary); margin-bottom: 10px; padding-top: 16px;
-  }
+.cdot{width:20px;height:20px;border-radius:50%;display:flex;align-items:center;justify-content:center;flex-shrink:0;font-size:11px;font-weight:700}
+.cdot.pass{background:var(--g500);color:#fff}
+.cdot.fail{background:var(--r400);color:#fff}
+.cdot.warn{background:var(--a400);color:#fff}
+.cdot.unknown{background:#B4B2A9;color:#fff}
 
-  .check-list { display: flex; flex-direction: column; gap: 7px; }
-  .check-item {
-    display: flex; align-items: flex-start; gap: 10px; padding: 10px 13px;
-    border: 1px solid var(--border); border-radius: var(--radius-md); background: var(--surface-alt);
-  }
-  .check-item.fail { border-color: var(--red-100); background: var(--red-50); }
-  .check-item.warn { border-color: var(--amber-100); background: var(--amber-50); }
-  .check-item.pass { border-color: #C0DD97; background: #EAF3DE; }
+.cname{font-size:13px;font-weight:600}
+.cname.pass{color:#3B6D11}
+.cname.fail{color:var(--r600)}
+.cname.warn{color:var(--a600)}
+.cname.unknown{color:var(--ts)}
+.cdetail{font-size:12px;color:var(--ts);margin-top:3px;line-height:1.5}
+.check-item.fail .cdetail{color:var(--r600)}
+.check-item.warn .cdetail{color:var(--a600)}
 
-  .check-dot {
-    width: 20px; height: 20px; border-radius: 50%;
-    display: flex; align-items: center; justify-content: center;
-    flex-shrink: 0; font-size: 11px;
-  }
-  .check-dot.pass    { background: var(--green-500); color: #fff; }
-  .check-dot.fail    { background: var(--red-400); color: #fff; }
-  .check-dot.warn    { background: var(--amber-400); color: #fff; }
-  .check-dot.unknown { background: var(--gray-300); color: #fff; }
+.cwt{margin-left:auto;flex-shrink:0;font-size:10px;padding:2px 7px;border-radius:99px;font-weight:600;white-space:nowrap}
+.cwt.critical{background:#FFD0D0;color:#7A1F1F}
+.cwt.high{background:#FFE6CC;color:#6B3900}
+.cwt.medium{background:#E8F0FF;color:#1A3A7A}
 
-  .check-content { flex: 1; }
-  .check-name { font-size: 13px; font-weight: 600; }
-  .check-name.pass    { color: #3B6D11; }
-  .check-name.fail    { color: var(--red-600); }
-  .check-name.warn    { color: var(--amber-600); }
-  .check-name.unknown { color: var(--text-secondary); }
-  .check-detail { font-size: 12px; color: var(--text-secondary); margin-top: 3px; line-height: 1.5; }
-  .check-item.fail .check-detail { color: var(--red-600); }
-  .check-item.warn .check-detail { color: var(--amber-600); }
+.fields-section{padding:0 24px 24px;border-top:1px solid var(--bor);margin-top:4px}
+.fields-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:10px}
+.fi{padding:9px 12px;background:var(--alt);border-radius:10px;border:1px solid var(--bor)}
+.fl{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--tt)}
+.fv{font-size:13px;color:var(--tp);margin-top:3px;font-weight:500;word-break:break-all}
 
-  .fields-section { padding: 16px 24px 24px; border-top: 1px solid var(--border); }
-  .fields-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 10px; }
-  .field-item { padding: 10px 13px; background: var(--surface-alt); border-radius: var(--radius-md); border: 1px solid var(--border); }
-  .field-label { font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.06em; color: var(--text-tertiary); }
-  .field-value { font-size: 13px; color: var(--text-primary); margin-top: 4px; font-weight: 500; word-break: break-all; }
+.error-box{padding:14px 18px;border-radius:10px;background:var(--r50);border:1px solid var(--r100);color:var(--r600);font-size:13px;line-height:1.6;margin-bottom:18px}
 
-  .error-box {
-    padding: 14px 18px; border-radius: var(--radius-md);
-    background: var(--red-50); border: 1px solid var(--red-100);
-    color: var(--red-600); font-size: 13px; line-height: 1.6; margin-bottom: 20px;
-  }
+.footer{text-align:center;padding:28px 24px 16px;font-size:12px;color:var(--tt)}
+.footer a{color:var(--g700);text-decoration:none}
 
-  .footer { text-align: center; padding: 32px 24px 16px; font-size: 12px; color: var(--text-tertiary); }
-  .footer a { color: var(--green-700); text-decoration: none; }
+#qrCanvas,#pageCanvas{display:none}
+
+@media(max-width:540px){
+  .main{padding:14px 12px 60px}
+  .panel{padding:16px}
+  .fields-grid{grid-template-columns:1fr}
+  .tb-badge{display:none}
+}
 </style>
 </head>
 <body>
 
 <div class="topbar">
-  <div class="topbar-icon">
+  <div class="tb-icon">
     <svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
   </div>
   <div>
-    <div class="topbar-title">Sick Leave Authenticity Checker</div>
-    <div class="topbar-sub">Seha / Saudi MOH — Forgery Detection</div>
+    <div class="tb-title">Sick Leave Authenticity Checker</div>
+    <div class="tb-sub">Seha / Saudi MOH — Forgery Detection</div>
   </div>
-  <span class="topbar-badge">AI Powered</span>
+  <span class="tb-badge">100% Free · No API Key</span>
 </div>
+
+<canvas id="qrCanvas"></canvas>
+<canvas id="pageCanvas"></canvas>
 
 <div class="main">
 
-  <div class="key-panel">
-    <div class="key-panel-header">
-      <span class="key-lock">🔑</span>
-      <div>
-        <div class="key-panel-title">Gemini API Key</div>
-        <div class="key-panel-sub">Using your provided key for analysis</div>
-      </div>
-    </div>
-    <div class="key-input-row">
-      <input class="key-input" type="password" id="apiKeyInput" value="AIzaSyAlm1Xdp-je850CVq11C00l90pu3kkIiaU" autocomplete="off" spellcheck="false">
-      <button class="key-save-btn" id="keySaveBtn">Save key</button>
-    </div>
-    <div class="key-status" id="keyStatus"></div>
+  <div class="info-strip">
+    <strong>How it works — zero cost, zero API keys:</strong>
+    OCR extracts all text → QR code is decoded and URL verified → 12 rules check every field →
+    weighted score determines verdict. Works fully offline in your browser.
   </div>
 
-  <div class="panel locked" id="uploadPanel">
-    <div class="panel-title">Upload document</div>
+  <div class="panel">
+    <div class="panel-title">Upload sick leave document</div>
     <div class="drop-zone" id="dropZone">
       <input type="file" id="fileInput" accept=".pdf,image/*">
       <span class="drop-icon">📋</span>
-      <div class="drop-main">Drop sick leave file here, or <span>browse</span></div>
-      <div class="drop-sub">Accepts PDF, JPG, PNG, WEBP</div>
+      <div class="drop-main">Drop file here, or <span>browse</span></div>
+      <div class="drop-sub">PDF · JPG · PNG · WEBP — OCR takes ~15 seconds</div>
     </div>
-    <div id="fileRow" style="display:none;" class="file-row">
-      <span class="file-row-icon" id="fileIcon">📄</span>
+    <div id="fileRow" style="display:none" class="file-row">
+      <span style="font-size:24px" id="fileIcon">📄</span>
       <div class="file-row-info">
         <div class="file-row-name" id="fileName"></div>
         <div class="file-row-size" id="fileSize"></div>
@@ -298,168 +195,519 @@
       <button class="file-row-remove" id="removeBtn">✕</button>
     </div>
     <button class="analyze-btn" id="analyzeBtn" disabled>
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round">
+      <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round">
         <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
       </svg>
       Analyze document
     </button>
   </div>
 
-  <div class="status-bar" id="statusBar">
-    <div class="spinner"></div>
-    <span id="statusText">Reading document...</span>
+  <div class="progress-panel" id="progressPanel">
+    <div class="prog-title">🔍 Analyzing document…</div>
+    <div class="prog-steps" id="progSteps"></div>
   </div>
 
-  <div class="error-box" id="errorBox" style="display:none;"></div>
+  <div class="error-box" id="errorBox" style="display:none"></div>
   <div id="resultArea"></div>
+</div>
 
+<div class="footer">
+  Official verification: <a href="https://www.seha.sa/#/inquiries/slenquiry" target="_blank">www.seha.sa/#/inquiries/slenquiry</a>
 </div>
 
 <script>
-const SYSTEM_PROMPT = `Analyze Saudi Arabian Seha (صحتي) sick leave report authentication. Detect signs of forgery.
+pdfjsLib.GlobalWorkerOptions.workerSrc =
+  'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
 
-A genuine report must have:
-1. QR code linking to https://www.seha.sa/#/inquiries/slenquiry
-2. ID: PSL + 14 digits
-3. Seha logo & KSA header
-4. National Health Information Centre logo (bottom right)
-5. Hospital info & 16-digit license starting with 38 (bottom left)
-6. Consistent dates: admission <= discharge <= issue date
-7. Print timestamp at bottom left
+// ── DOM ──
+const dropZone      = document.getElementById('dropZone');
+const fileInput     = document.getElementById('fileInput');
+const fileRow       = document.getElementById('fileRow');
+const fileIcon      = document.getElementById('fileIcon');
+const fileNameEl    = document.getElementById('fileName');
+const fileSizeEl    = document.getElementById('fileSize');
+const removeBtn     = document.getElementById('removeBtn');
+const analyzeBtn    = document.getElementById('analyzeBtn');
+const progressPanel = document.getElementById('progressPanel');
+const progSteps     = document.getElementById('progSteps');
+const errorBox      = document.getElementById('errorBox');
+const resultArea    = document.getElementById('resultArea');
+const qrCanvas      = document.getElementById('qrCanvas');
+const pageCanvas    = document.getElementById('pageCanvas');
 
-Return ONLY JSON:
-{
-  "verdict": "FORGED|AUTHENTIC|INCONCLUSIVE",
-  "confidence": "High|Medium|Low",
-  "summary": "2-3 sentences",
-  "checks": [
-    {"name": "Check Name", "status": "PASS|FAIL|WARN|UNKNOWN", "detail": "findings"}
-  ],
-  "extractedFields": {
-    "leaveId": "", "patientName": "", "nationalId": "", "nationality": "", 
-    "hospital": "", "licenseNumber": "", "practitioner": "", 
-    "admissionDate": "", "dischargeDate": "", "issueDate": "", 
-    "printTimestamp": "", "employer": ""
-  }
-}`;
+let currentFile = null;
 
-const KEY_STORAGE = 'seha_gemini_key_v3';
-let apiKey = localStorage.getItem(KEY_STORAGE) || document.getElementById('apiKeyInput').value;
+function fmtSize(b){
+  if(b<1024) return b+' B';
+  if(b<1048576) return (b/1024).toFixed(1)+' KB';
+  return (b/1048576).toFixed(1)+' MB';
+}
 
-const apiKeyInput = document.getElementById('apiKeyInput');
-const keySaveBtn = document.getElementById('keySaveBtn');
-const keyStatus = document.getElementById('keyStatus');
-const uploadPanel = document.getElementById('uploadPanel');
+function loadFile(f){
+  currentFile = f;
+  const ext = f.name.split('.').pop().toLowerCase();
+  fileIcon.textContent = ext==='pdf'?'📄':'🖼️';
+  fileNameEl.textContent = f.name;
+  fileSizeEl.textContent = fmtSize(f.size);
+  fileRow.style.display='flex';
+  analyzeBtn.disabled=false;
+  clearResults();
+}
+function clearResults(){
+  resultArea.innerHTML='';
+  errorBox.style.display='none';
+  progressPanel.classList.remove('show');
+  progSteps.innerHTML='';
+}
 
-function applyKeyState() {
-  if (apiKey && apiKey.startsWith('AIzaSy')) {
-    uploadPanel.classList.remove('locked');
-    apiKeyInput.value = apiKey;
-    keyStatus.className = 'key-status ok';
-    keyStatus.textContent = '✓ Ready for analysis';
-    keyStatus.style.display = 'block';
+fileInput.addEventListener('change',e=>{ if(e.target.files[0]) loadFile(e.target.files[0]); });
+dropZone.addEventListener('dragover',e=>{ e.preventDefault(); dropZone.classList.add('drag'); });
+dropZone.addEventListener('dragleave',()=>dropZone.classList.remove('drag'));
+dropZone.addEventListener('drop',e=>{
+  e.preventDefault(); dropZone.classList.remove('drag');
+  if(e.dataTransfer.files[0]) loadFile(e.dataTransfer.files[0]);
+});
+removeBtn.addEventListener('click',()=>{
+  currentFile=null; fileRow.style.display='none';
+  analyzeBtn.disabled=true; fileInput.value=''; clearResults();
+});
+
+// ── Progress steps ──
+const STEPS = [
+  {id:'render', label:'Rendering document to image'},
+  {id:'qr',     label:'Scanning QR code'},
+  {id:'ocr',    label:'Running OCR — text extraction'},
+  {id:'rules',  label:'Running 12 validation rules'},
+  {id:'score',  label:'Computing authenticity score'},
+];
+let stepEls={};
+
+function initProgress(){
+  progSteps.innerHTML=''; stepEls={};
+  STEPS.forEach(s=>{
+    const d=document.createElement('div');
+    d.className='prog-step';
+    d.innerHTML=`<div class="step-dot idle" id="sd_${s.id}"></div><span id="sl_${s.id}">${s.label}</span>`;
+    progSteps.appendChild(d);
+    stepEls[s.id]={dot:d.querySelector('#sd_'+s.id), lbl:d.querySelector('#sl_'+s.id), row:d};
+  });
+}
+function setStep(id,state,extra){
+  const el=stepEls[id]; if(!el) return;
+  el.dot.className='step-dot '+state;
+  el.dot.textContent = state==='done'?'✓':state==='fail'?'✕':state==='skip'?'–':'';
+  el.row.className='prog-step '+(state==='done'?'done':state==='fail'?'err':state==='spin'?'active':'');
+  if(extra) el.lbl.textContent=extra;
+}
+
+// ── File → canvas ──
+async function fileToCanvas(file){
+  const ext=file.name.split('.').pop().toLowerCase();
+  if(ext==='pdf'){
+    const ab=await file.arrayBuffer();
+    const pdf=await pdfjsLib.getDocument({data:ab}).promise;
+    const page=await pdf.getPage(1);
+    const vp=page.getViewport({scale:2.5});
+    pageCanvas.width=vp.width; pageCanvas.height=vp.height;
+    const ctx=pageCanvas.getContext('2d');
+    await page.render({canvasContext:ctx,viewport:vp}).promise;
+    return {canvas:pageCanvas, imgData:ctx.getImageData(0,0,vp.width,vp.height), w:vp.width, h:vp.height};
   } else {
-    uploadPanel.classList.add('locked');
-  }
-}
-
-keySaveBtn.addEventListener('click', () => {
-  apiKey = apiKeyInput.value.trim();
-  localStorage.setItem(KEY_STORAGE, apiKey);
-  applyKeyState();
-});
-
-applyKeyState();
-
-let fileData = null;
-const dropZone = document.getElementById('dropZone');
-const fileInput = document.getElementById('fileInput');
-const fileRow = document.getElementById('fileRow');
-const fileName = document.getElementById('fileName');
-const fileSizeEl = document.getElementById('fileSize');
-const analyzeBtn = document.getElementById('analyzeBtn');
-const statusBar = document.getElementById('statusBar');
-const errorBox = document.getElementById('errorBox');
-const resultArea = document.getElementById('resultArea');
-
-function loadFile(file) {
-  fileName.textContent = file.name;
-  fileSizeEl.textContent = (file.size/1024).toFixed(1) + ' KB';
-  fileRow.style.display = 'flex';
-  analyzeBtn.disabled = false;
-  const reader = new FileReader();
-  reader.onload = e => {
-    fileData = { 
-        base64: e.target.result.split(',')[1], 
-        mediaType: file.type || 'image/jpeg' 
-    };
-  };
-  reader.readAsDataURL(file);
-}
-
-fileInput.addEventListener('change', e => { if (e.target.files[0]) loadFile(e.target.files[0]); });
-
-analyzeBtn.addEventListener('click', async () => {
-  analyzeBtn.disabled = true;
-  errorBox.style.display = 'none';
-  statusBar.classList.add('show');
-  
-  try {
-    const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-3-flash-preview:generateContent?key=${apiKey}`;
-    
-    const response = await fetch(url, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        systemInstruction: { parts: [{ text: SYSTEM_PROMPT }] },
-        generationConfig: { responseMimeType: "application/json" },
-        contents: [{
-          parts: [
-            { inlineData: { mimeType: fileData.mediaType, data: fileData.base64 } },
-            { text: "Analyze this document for authenticity." }
-          ]
-        }]
-      })
+    return new Promise((res,rej)=>{
+      const img=new Image(), url=URL.createObjectURL(file);
+      img.onload=()=>{
+        pageCanvas.width=img.naturalWidth; pageCanvas.height=img.naturalHeight;
+        const ctx=pageCanvas.getContext('2d');
+        ctx.drawImage(img,0,0);
+        URL.revokeObjectURL(url);
+        res({canvas:pageCanvas, imgData:ctx.getImageData(0,0,img.naturalWidth,img.naturalHeight), w:img.naturalWidth, h:img.naturalHeight});
+      };
+      img.onerror=rej; img.src=url;
     });
-
-    const data = await response.json();
-    if (!response.ok) throw new Error(data.error?.message || "API Error");
-    
-    const result = JSON.parse(data.candidates[0].content.parts[0].text);
-    renderResult(result);
-  } catch (err) {
-    errorBox.textContent = "Error: " + err.message;
-    errorBox.style.display = 'block';
-  } finally {
-    analyzeBtn.disabled = false;
-    statusBar.classList.remove('show');
   }
-});
+}
 
-function renderResult(data) {
-  const v = (data.verdict || 'inconclusive').toLowerCase();
-  const checks = (data.checks || []).map(c => `
-    <div class="check-item ${c.status.toLowerCase()}">
-      <div class="check-dot ${c.status.toLowerCase()}">${c.status === 'PASS' ? '✓' : '✕'}</div>
-      <div class="check-content">
-        <div class="check-name">${c.name}</div>
-        <div class="check-detail">${c.detail}</div>
+// ── QR scan ──
+function scanQR(imgData,w,h){
+  // Try full image first
+  let r=jsQR(imgData.data,w,h,{inversionAttempts:'dontInvert'});
+  if(r) return r.data;
+  // Try bottom-left quarter (where Seha places QR)
+  const ctx=qrCanvas.getContext('2d');
+  const cw=Math.floor(w*0.4), ch=Math.floor(h*0.4);
+  qrCanvas.width=cw; qrCanvas.height=ch;
+  const src=pageCanvas.getContext('2d');
+  const crop=src.getImageData(0,Math.floor(h*0.55),cw,ch);
+  ctx.putImageData(crop,0,0);
+  r=jsQR(crop.data,cw,ch,{inversionAttempts:'attemptBoth'});
+  return r ? r.data : null;
+}
+
+// ── OCR ──
+async function runOCR(canvas){
+  const worker=await Tesseract.createWorker(['eng','ara'],1,{logger:()=>{}});
+  const {data}=await worker.recognize(canvas);
+  await worker.terminate();
+  return data.text||'';
+}
+
+// ── EXIF ──
+function getExif(file){
+  return new Promise(res=>{
+    try{ EXIF.getData(file,function(){ res(EXIF.getAllTags(this)||{}); }); }
+    catch{ res({}); }
+  });
+}
+
+// ── Rule engine ──
+const SEHA_QR = 'https://www.seha.sa/#/inquiries/slenquiry';
+
+function runRules(text, qrUrl, exif){
+  const t=text;
+  const tl=t.toLowerCase();
+  const has=(...pats)=>pats.some(p=>typeof p==='string'?tl.includes(p.toLowerCase()):p.test(t));
+  const checks=[];
+
+  // 1. QR Code — CRITICAL
+  if(qrUrl===null){
+    checks.push({name:'QR Code Verification',status:'FAIL',weight:'critical',
+      detail:'No QR code found in document. Every genuine Seha document contains a QR code linking to seha.sa/#/inquiries/slenquiry.'});
+  } else if(qrUrl && qrUrl.includes('seha.sa') && qrUrl.includes('slenquiry')){
+    checks.push({name:'QR Code Verification',status:'PASS',weight:'critical',
+      detail:`QR code successfully decoded and points to official Seha portal: ${qrUrl}`});
+  } else if(qrUrl){
+    checks.push({name:'QR Code Verification',status:'FAIL',weight:'critical',
+      detail:`QR code found but URL is wrong: "${qrUrl}" — should be seha.sa/#/inquiries/slenquiry. Strong forgery indicator.`});
+  } else {
+    checks.push({name:'QR Code Verification',status:'WARN',weight:'critical',
+      detail:'QR scan was inconclusive — document may have low print quality. Manual scan recommended.'});
+  }
+
+  // 2. Leave ID
+  const leaveId=t.match(/\bPSL\d{14}\b/);
+  if(leaveId){
+    checks.push({name:'Leave ID Format',status:'PASS',weight:'high',
+      detail:`Valid Leave ID found: ${leaveId[0]} (PSL + 14 digits)`});
+  } else {
+    const partial=t.match(/PSL\d+/);
+    checks.push({name:'Leave ID Format',status:'FAIL',weight:'high',
+      detail:partial?`Malformed Leave ID "${partial[0]}" — must be PSL followed by exactly 14 digits`
+        :'No PSL Leave ID found. Genuine documents always contain a Leave ID starting with PSL.'});
+  }
+
+  // 3. Seha branding
+  const hSeha=has('seha','صحة');
+  const hKSA=has('kingdom of saudi arabia','المملكة العربية السعودية');
+  const hNHIC=has('national health information','المركز الوطني للمعلومات');
+  if(hSeha&&hKSA&&hNHIC){
+    checks.push({name:'Seha Branding',status:'PASS',weight:'high',
+      detail:'Seha logo, Kingdom of Saudi Arabia header, and National Health Information Centre all confirmed.'});
+  } else {
+    const miss=[];
+    if(!hSeha) miss.push('Seha logo');
+    if(!hKSA) miss.push('Kingdom of Saudi Arabia header');
+    if(!hNHIC) miss.push('National Health Information Centre');
+    checks.push({name:'Seha Branding',status:miss.length===3?'FAIL':'WARN',weight:'high',
+      detail:`Missing: ${miss.join(', ')}`});
+  }
+
+  // 4. Document type header
+  if(has('sick leave report','sick leave','تقرير إجازة مرضية','إجازة مرضية')){
+    checks.push({name:'Document Type Header',status:'PASS',weight:'medium',
+      detail:'Sick Leave Report title confirmed (Arabic and/or English).'});
+  } else {
+    checks.push({name:'Document Type Header',status:'WARN',weight:'medium',
+      detail:'Could not confirm Sick Leave Report title — may be OCR noise on this field.'});
+  }
+
+  // 5. Verification URL
+  if(has('seha.sa/#/inquiries/slenquiry','slenquiry')){
+    checks.push({name:'Printed Verification URL',status:'PASS',weight:'high',
+      detail:'Official Seha verification URL is printed in the document as required.'});
+  } else {
+    checks.push({name:'Printed Verification URL',status:'FAIL',weight:'high',
+      detail:'Verification URL www.seha.sa/#/inquiries/slenquiry not found. All real Seha documents print this for validation.'});
+  }
+
+  // 6. Hospital license (38 + 14 digits = 16 total)
+  const lic=t.match(/38\d{14}/);
+  if(lic){
+    checks.push({name:'Hospital License Number',status:'PASS',weight:'high',
+      detail:`License number confirmed: ${lic[0]}`});
+  } else if(has('رقم الترخيص','license')){
+    checks.push({name:'Hospital License Number',status:'WARN',weight:'high',
+      detail:'License field found but 16-digit number starting with "38" could not be extracted cleanly by OCR.'});
+  } else {
+    checks.push({name:'Hospital License Number',status:'FAIL',weight:'high',
+      detail:'Hospital license number (16 digits starting with 38) not found. Required on all genuine documents.'});
+  }
+
+  // 7. Date extraction and logic
+  const datePat=/\b(\d{2})[.\-\/](\d{2})[.\-\/](\d{4})\b/g;
+  const dates=[]; let dm;
+  while((dm=datePat.exec(t))!==null){
+    try{
+      const d=new Date(`${dm[3]}-${dm[2]}-${dm[1]}`);
+      if(!isNaN(d)) dates.push(d);
+    }catch{}
+  }
+  dates.sort((a,b)=>a-b);
+  const today=new Date();
+  if(dates.length>=2){
+    const allFuture=dates.every(d=>d>today);
+    const spread=(dates[dates.length-1]-dates[0])/86400000;
+    if(allFuture){
+      checks.push({name:'Date Consistency',status:'FAIL',weight:'high',
+        detail:'All detected dates are in the future — strong forgery indicator. Dates should be past or current.'});
+    } else if(spread>180){
+      checks.push({name:'Date Consistency',status:'WARN',weight:'high',
+        detail:`Date range is ${Math.round(spread)} days — unusually wide. Verify dates manually.`});
+    } else {
+      checks.push({name:'Date Consistency',status:'PASS',weight:'high',
+        detail:`${dates.length} dates extracted, all within acceptable range.`});
+    }
+  } else {
+    checks.push({name:'Date Consistency',status:'WARN',weight:'medium',
+      detail:'Could not extract enough dates to verify consistency. OCR may have had difficulty with date fields.'});
+  }
+
+  // 8. Leave duration
+  const durMatch=t.match(/(\d+)\s*(day|يوم|أيام)/i);
+  if(durMatch&&dates.length>=2){
+    const stated=parseInt(durMatch[1]);
+    const span=Math.round((dates[dates.length-1]-dates[0])/86400000)+1;
+    if(Math.abs(stated-span)<=1){
+      checks.push({name:'Leave Duration Match',status:'PASS',weight:'medium',
+        detail:`Stated ${stated} day(s) matches date range calculation of ${span} day(s).`});
+    } else {
+      checks.push({name:'Leave Duration Match',status:'FAIL',weight:'medium',
+        detail:`Mismatch: document says ${stated} day(s) but dates calculate to ${span} day(s). Possible date tampering.`});
+    }
+  } else {
+    checks.push({name:'Leave Duration Match',status:'WARN',weight:'medium',
+      detail:'Duration field or dates not fully extracted — manual verification needed.'});
+  }
+
+  // 9. Employer field (should be blank)
+  const empSection=t.match(/employer[\s\S]{0,80}/i)||t.match(/جهة العمل[\s\S]{0,80}/);
+  if(empSection){
+    const sn=empSection[0];
+    const filled=/employer\s*[\|:]\s*\w{3,}/i.test(sn)||/جهة العمل\s*[\|:]\s*[\u0600-\u06FF]{3,}/.test(sn);
+    checks.push({name:'Employer Field',status:filled?'WARN':'PASS',weight:'medium',
+      detail:filled?'Employer field appears filled — genuine documents leave this blank.'
+        :'Employer field appears blank, consistent with genuine documents.'});
+  } else {
+    checks.push({name:'Employer Field',status:'UNKNOWN',weight:'medium',
+      detail:'Employer field not clearly located in OCR output.'});
+  }
+
+  // 10. Print timestamp
+  const timeMatch=t.match(/\d{1,2}:\d{2}\s*(AM|PM|am|pm)/i);
+  const weekday=has('monday','tuesday','wednesday','thursday','friday','saturday','sunday',
+    'الاثنين','الثلاثاء','الأربعاء','الخميس','الجمعة','السبت','الأحد');
+  if(timeMatch&&weekday){
+    checks.push({name:'Print Timestamp',status:'PASS',weight:'medium',
+      detail:`Timestamp with time and weekday found: ${timeMatch[0]}`});
+  } else if(timeMatch||weekday){
+    checks.push({name:'Print Timestamp',status:'WARN',weight:'medium',
+      detail:'Partial timestamp — genuine documents show full time + weekday + date at bottom left.'});
+  } else {
+    checks.push({name:'Print Timestamp',status:'WARN',weight:'medium',
+      detail:'Print timestamp not detected. Seha PDFs always include generation time at bottom left.'});
+  }
+
+  // 11. Practitioner
+  const hasPrac=has('practitioner','الممارس','اسم الممارس');
+  const hasPos=has('general','طبيب عام','specialist','طبيب أخصائي');
+  if(hasPrac&&hasPos){
+    checks.push({name:'Practitioner Details',status:'PASS',weight:'medium',
+      detail:'Practitioner name and position (General/Specialist) confirmed.'});
+  } else if(hasPrac||hasPos){
+    checks.push({name:'Practitioner Details',status:'WARN',weight:'medium',
+      detail:'Practitioner field partially detected — verify manually.'});
+  } else {
+    checks.push({name:'Practitioner Details',status:'FAIL',weight:'medium',
+      detail:'Practitioner name and position not found. Required on all Seha documents.'});
+  }
+
+  // 12. EXIF metadata
+  const sw=exif?.Software||exif?.software||'';
+  const edited=/photoshop|gimp|illustrator|paint|inkscape|canva/i.test(sw);
+  if(edited){
+    checks.push({name:'File Metadata',status:'FAIL',weight:'high',
+      detail:`Image edited with: "${sw}" — clear sign of document manipulation.`});
+  } else if(Object.keys(exif).length===0){
+    checks.push({name:'File Metadata',status:'WARN',weight:'medium',
+      detail:'No EXIF metadata found. PDFs naturally lack EXIF; images should have camera/scanner metadata.'});
+  } else {
+    checks.push({name:'File Metadata',status:'PASS',weight:'medium',
+      detail:`Metadata present. Software: "${sw||'not specified'}" — no editing software detected.`});
+  }
+
+  return checks;
+}
+
+// ── Scoring ──
+function score(checks){
+  const W={critical:40,high:15,medium:7};
+  const S={PASS:1,WARN:0.5,UNKNOWN:0.4,FAIL:0};
+  let tot=0,earn=0;
+  checks.forEach(c=>{const w=W[c.weight]||7; tot+=w; earn+=w*(S[c.status]??0);});
+  return Math.round(earn/tot*100);
+}
+
+function verdict(sc,checks){
+  const cf=checks.filter(c=>c.weight==='critical'&&c.status==='FAIL').length;
+  const hf=checks.filter(c=>c.weight==='high'&&c.status==='FAIL').length;
+  if(cf>=1||hf>=3||sc<35) return {v:'forged',label:'Suspected Forgery',emoji:'🚨'};
+  if(sc>=72&&cf===0&&hf===0) return {v:'authentic',label:'Appears Authentic',emoji:'✅'};
+  return {v:'inconclusive',label:'Inconclusive — Manual Review Required',emoji:'⚠️'};
+}
+
+function extractFields(text){
+  return {
+    leaveId:    (text.match(/PSL\d+/)||[])[0]||'',
+    nationalId: (text.match(/\b(23|10)\d{8}\b/)||[])[0]||'',
+    license:    (text.match(/38\d{14}/)||[])[0]||'',
+    date:       (text.match(/\d{2}[.\-\/]\d{2}[.\-\/]\d{4}/)||[])[0]||'',
+    time:       (text.match(/\d{1,2}:\d{2}\s*(AM|PM)/i)||[])[0]||'',
+  };
+}
+
+// ── Render ──
+function renderResult(checks,sc,vObj,fields,qrUrl){
+  const v=vObj.v;
+  const r=28, circ=2*Math.PI*r, dash=circ*(1-sc/100);
+  const col=v==='forged'?'#E24B4A':v==='authentic'?'#1D9E75':'#BA7517';
+
+  const checksHtml=checks.map(c=>{
+    const cls=c.status==='PASS'?'pass':c.status==='FAIL'?'fail':c.status==='WARN'?'warn':'unknown';
+    const icon=cls==='pass'?'✓':cls==='fail'?'✕':cls==='warn'?'!':'?';
+    const wl=c.weight==='critical'?'Critical':c.weight==='high'?'High':'Medium';
+    return `<div class="check-item ${cls}">
+      <div class="cdot ${cls}">${icon}</div>
+      <div style="flex:1">
+        <div class="cname ${cls}">${c.name}</div>
+        <div class="cdetail">${c.detail}</div>
       </div>
-    </div>
-  `).join('');
+      <span class="cwt ${c.weight}">${wl}</span>
+    </div>`;
+  }).join('');
 
-  resultArea.innerHTML = `
+  const pairs=[
+    ['Leave ID',fields.leaveId],['National ID',fields.nationalId],
+    ['License no.',fields.license],['Date found',fields.date],
+    ['Print time',fields.time],['QR URL',qrUrl||'Not detected'],
+  ].filter(([,val])=>val&&val.trim());
+
+  const fieldsHtml=pairs.length?`
+    <div class="fields-section">
+      <div class="section-label" style="padding-top:16px">Extracted data</div>
+      <div class="fields-grid">
+        ${pairs.map(([l,val])=>`<div class="fi"><div class="fl">${l}</div><div class="fv">${val}</div></div>`).join('')}
+      </div>
+    </div>`:'';
+
+  const fails=checks.filter(c=>c.status==='FAIL');
+  const warns=checks.filter(c=>c.status==='WARN');
+  let summary='';
+  if(v==='forged'){
+    const critFail=checks.find(c=>c.weight==='critical'&&c.status==='FAIL');
+    summary=`This document has ${fails.length} failed check(s) and scored ${sc}/100. ${critFail?'Critical issue: '+critFail.detail+' ':''} Do NOT accept without manual verification at seha.sa.`;
+  } else if(v==='authentic'){
+    summary=`Document passed all critical checks with a score of ${sc}/100. QR code, Leave ID, branding, and dates are consistent with a genuine Seha sick leave report.`;
+  } else {
+    summary=`Score ${sc}/100 — ${fails.length} check(s) failed, ${warns.length} need review. Manual verification at www.seha.sa/#/inquiries/slenquiry is strongly recommended before accepting this document.`;
+  }
+
+  resultArea.innerHTML=`
     <div class="result-card ${v}">
       <div class="verdict-banner ${v}">
+        <div class="verdict-icon ${v}">${vObj.emoji}</div>
         <div class="verdict-text">
-          <h2 class="${v}">${data.verdict}</h2>
-          <p>${data.confidence} Confidence</p>
+          <h2 class="${v}">${vObj.label}</h2>
+          <p>Rule-based · ${checks.length} checks · No AI required</p>
+        </div>
+        <div class="score-wrap">
+          <svg width="70" height="70" viewBox="0 0 70 70">
+            <circle cx="35" cy="35" r="${r}" fill="none" stroke="#E0DED7" stroke-width="6"/>
+            <circle cx="35" cy="35" r="${r}" fill="none" stroke="${col}" stroke-width="6"
+              stroke-dasharray="${circ.toFixed(2)}" stroke-dashoffset="${dash.toFixed(2)}"
+              stroke-linecap="round" transform="rotate(-90 35 35)"/>
+            <text x="35" y="39" text-anchor="middle" font-size="14" font-weight="700" fill="${col}">${sc}</text>
+          </svg>
+          <div class="score-label">/ 100</div>
         </div>
       </div>
-      <div class="summary-section"><p>${data.summary}</p></div>
-      <div class="checks-section"><div class="check-list">${checks}</div></div>
+      <div class="summary-section"><p>${summary}</p></div>
+      <div class="checks-section">
+        <div class="section-label">Detailed checks</div>
+        <div class="check-list">${checksHtml}</div>
+      </div>
+      ${fieldsHtml}
     </div>`;
 }
+
+// ── Main pipeline ──
+analyzeBtn.addEventListener('click', async()=>{
+  if(!currentFile) return;
+  analyzeBtn.disabled=true;
+  analyzeBtn.innerHTML=`<div style="width:17px;height:17px;border:2px solid rgba(255,255,255,.4);border-top-color:#fff;border-radius:50%;animation:spin .7s linear infinite"></div> Analyzing…`;
+  clearResults();
+  initProgress();
+  progressPanel.classList.add('show');
+
+  try{
+    // Step 1
+    setStep('render','spin');
+    let img;
+    try{ img=await fileToCanvas(currentFile); setStep('render','done','Document rendered ✓'); }
+    catch(e){ setStep('render','fail','Render failed'); throw e; }
+
+    // Step 2
+    setStep('qr','spin');
+    let qrUrl=null;
+    try{
+      qrUrl=scanQR(img.imgData,img.w,img.h);
+      if(qrUrl) setStep('qr','done',`QR found: ${qrUrl.slice(0,55)}`);
+      else setStep('qr','fail','No QR code detected');
+    }catch{ setStep('qr','fail','QR scan error'); }
+
+    // Step 3
+    setStep('ocr','spin','OCR running (~15 sec)…');
+    let ocrText='';
+    try{ ocrText=await runOCR(img.canvas); setStep('ocr','done',`${ocrText.length} chars extracted`); }
+    catch(e){ setStep('ocr','fail','OCR error: '+e.message); }
+
+    const exif=await getExif(currentFile).catch(()=>({}));
+
+    // Step 4
+    setStep('rules','spin');
+    let checks;
+    try{ checks=runRules(ocrText,qrUrl,exif); setStep('rules','done',`${checks.length} checks done`); }
+    catch(e){ setStep('rules','fail','Rule error'); throw e; }
+
+    // Step 5
+    setStep('score','spin');
+    const sc=score(checks);
+    const vObj=verdict(sc,checks);
+    const fields=extractFields(ocrText);
+    setStep('score','done',`Score ${sc}/100 → ${vObj.label}`);
+
+    setTimeout(()=>{
+      progressPanel.classList.remove('show');
+      renderResult(checks,sc,vObj,fields,qrUrl);
+    },500);
+
+  }catch(err){
+    progressPanel.classList.remove('show');
+    errorBox.textContent='⚠️ Analysis failed: '+err.message;
+    errorBox.style.display='block';
+  }finally{
+    analyzeBtn.disabled=false;
+    analyzeBtn.innerHTML=`<svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg> Analyze document`;
+  }
+});
 </script>
 </body>
 </html>
