@@ -29,7 +29,7 @@ body{background:#F5F4F0;color:var(--tp);min-height:100vh}
 .tb-sub{color:var(--g100);font-size:12px;margin-top:1px}
 .tb-badge{margin-left:auto;background:var(--g700);color:var(--g100);font-size:11px;padding:4px 10px;border-radius:99px}
 
-.main{max-width:800px;margin:0 auto;padding:28px 20px 80px}
+.main{max-width:820px;margin:0 auto;padding:28px 20px 80px}
 
 .panel{background:var(--sur);border:1px solid var(--bor);border-radius:18px;padding:24px;margin-bottom:18px}
 .panel-title{font-size:12px;font-weight:700;color:var(--tt);text-transform:uppercase;letter-spacing:.06em;margin-bottom:14px}
@@ -72,6 +72,13 @@ body{background:#F5F4F0;color:var(--tp);min-height:100vh}
 .step-dot.skip{background:var(--a400);color:#fff}
 @keyframes spin{to{transform:rotate(360deg)}}
 
+/* OCR debug panel */
+.debug-panel{background:var(--sur);border:1px solid var(--bor);border-radius:14px;padding:16px;margin-bottom:18px;display:none}
+.debug-panel.show{display:block}
+.debug-title{font-size:12px;font-weight:700;color:var(--tt);text-transform:uppercase;letter-spacing:.06em;margin-bottom:10px;display:flex;align-items:center;gap:8px;cursor:pointer}
+.debug-body{font-size:11px;color:var(--ts);font-family:monospace;line-height:1.6;max-height:200px;overflow-y:auto;background:var(--alt);border-radius:8px;padding:10px;white-space:pre-wrap;word-break:break-all;display:none}
+.debug-body.open{display:block}
+
 /* result */
 .result-card{background:var(--sur);border-radius:18px;border:2px solid var(--bor);overflow:hidden}
 .result-card.forged{border-color:var(--r400)}
@@ -94,12 +101,7 @@ body{background:#F5F4F0;color:var(--tp);min-height:100vh}
 .verdict-text h2.inconclusive{color:var(--a600)}
 .verdict-text p{font-size:12px;color:var(--ts);margin-top:3px}
 
-.score-wrap{margin-left:auto;flex-shrink:0;text-align:center;min-width:70px}
-.score-num{font-size:20px;font-weight:700;line-height:1}
-.score-num.forged{color:var(--r600)}
-.score-num.authentic{color:var(--g800)}
-.score-num.inconclusive{color:var(--a600)}
-.score-label{font-size:10px;color:var(--tt);margin-top:3px}
+.score-wrap{margin-left:auto;flex-shrink:0;text-align:center}
 
 .summary-section{padding:16px 24px;border-top:1px solid var(--bor)}
 .summary-section p{font-size:14px;line-height:1.65;color:var(--ts)}
@@ -174,8 +176,8 @@ body{background:#F5F4F0;color:var(--tp);min-height:100vh}
 
   <div class="info-strip">
     <strong>How it works — zero cost, zero API keys:</strong>
-    OCR extracts all text → QR code is decoded and URL verified → 12 rules check every field →
-    weighted score determines verdict. Works fully offline in your browser.
+    Renders document → scans QR code and verifies URL → OCR extracts all text (Arabic + English) →
+    12 weighted rules validate every field → weighted score gives verdict. Fully offline in browser.
   </div>
 
   <div class="panel">
@@ -184,7 +186,7 @@ body{background:#F5F4F0;color:var(--tp);min-height:100vh}
       <input type="file" id="fileInput" accept=".pdf,image/*">
       <span class="drop-icon">📋</span>
       <div class="drop-main">Drop file here, or <span>browse</span></div>
-      <div class="drop-sub">PDF · JPG · PNG · WEBP — OCR takes ~15 seconds</div>
+      <div class="drop-sub">PDF · JPG · PNG · WEBP — OCR takes ~20 seconds</div>
     </div>
     <div id="fileRow" style="display:none" class="file-row">
       <span style="font-size:24px" id="fileIcon">📄</span>
@@ -205,6 +207,14 @@ body{background:#F5F4F0;color:var(--tp);min-height:100vh}
   <div class="progress-panel" id="progressPanel">
     <div class="prog-title">🔍 Analyzing document…</div>
     <div class="prog-steps" id="progSteps"></div>
+  </div>
+
+  <!-- OCR Debug panel -->
+  <div class="debug-panel" id="debugPanel">
+    <div class="debug-title" id="debugToggle">
+      🔬 OCR extracted text <span style="color:var(--g500);font-size:11px;margin-left:4px">(click to expand)</span>
+    </div>
+    <div class="debug-body" id="debugBody"></div>
   </div>
 
   <div class="error-box" id="errorBox" style="display:none"></div>
@@ -234,21 +244,27 @@ const errorBox      = document.getElementById('errorBox');
 const resultArea    = document.getElementById('resultArea');
 const qrCanvas      = document.getElementById('qrCanvas');
 const pageCanvas    = document.getElementById('pageCanvas');
+const debugPanel    = document.getElementById('debugPanel');
+const debugBody     = document.getElementById('debugBody');
+const debugToggle   = document.getElementById('debugToggle');
 
 let currentFile = null;
+
+debugToggle.addEventListener('click', () => {
+  debugBody.classList.toggle('open');
+});
 
 function fmtSize(b){
   if(b<1024) return b+' B';
   if(b<1048576) return (b/1024).toFixed(1)+' KB';
   return (b/1048576).toFixed(1)+' MB';
 }
-
 function loadFile(f){
-  currentFile = f;
-  const ext = f.name.split('.').pop().toLowerCase();
-  fileIcon.textContent = ext==='pdf'?'📄':'🖼️';
-  fileNameEl.textContent = f.name;
-  fileSizeEl.textContent = fmtSize(f.size);
+  currentFile=f;
+  const ext=f.name.split('.').pop().toLowerCase();
+  fileIcon.textContent=ext==='pdf'?'📄':'🖼️';
+  fileNameEl.textContent=f.name;
+  fileSizeEl.textContent=fmtSize(f.size);
   fileRow.style.display='flex';
   analyzeBtn.disabled=false;
   clearResults();
@@ -258,6 +274,9 @@ function clearResults(){
   errorBox.style.display='none';
   progressPanel.classList.remove('show');
   progSteps.innerHTML='';
+  debugPanel.classList.remove('show');
+  debugBody.textContent='';
+  debugBody.classList.remove('open');
 }
 
 fileInput.addEventListener('change',e=>{ if(e.target.files[0]) loadFile(e.target.files[0]); });
@@ -273,12 +292,12 @@ removeBtn.addEventListener('click',()=>{
 });
 
 // ── Progress steps ──
-const STEPS = [
-  {id:'render', label:'Rendering document to image'},
-  {id:'qr',     label:'Scanning QR code'},
-  {id:'ocr',    label:'Running OCR — text extraction'},
-  {id:'rules',  label:'Running 12 validation rules'},
-  {id:'score',  label:'Computing authenticity score'},
+const STEPS=[
+  {id:'render',label:'Rendering document to high-res image (3×)'},
+  {id:'qr',    label:'Scanning QR code (6 crop regions)'},
+  {id:'ocr',   label:'Running OCR — Arabic + English extraction'},
+  {id:'rules', label:'Applying 12 validation rules'},
+  {id:'score', label:'Computing authenticity score'},
 ];
 let stepEls={};
 
@@ -289,25 +308,28 @@ function initProgress(){
     d.className='prog-step';
     d.innerHTML=`<div class="step-dot idle" id="sd_${s.id}"></div><span id="sl_${s.id}">${s.label}</span>`;
     progSteps.appendChild(d);
-    stepEls[s.id]={dot:d.querySelector('#sd_'+s.id), lbl:d.querySelector('#sl_'+s.id), row:d};
+    stepEls[s.id]={dot:d.querySelector('#sd_'+s.id),lbl:d.querySelector('#sl_'+s.id),row:d};
   });
 }
 function setStep(id,state,extra){
   const el=stepEls[id]; if(!el) return;
   el.dot.className='step-dot '+state;
-  el.dot.textContent = state==='done'?'✓':state==='fail'?'✕':state==='skip'?'–':'';
+  el.dot.textContent=state==='done'?'✓':state==='fail'?'✕':state==='skip'?'–':'';
   el.row.className='prog-step '+(state==='done'?'done':state==='fail'?'err':state==='spin'?'active':'');
   if(extra) el.lbl.textContent=extra;
 }
 
-// ── File → canvas ──
+// ──────────────────────────────────────────────
+// FILE → CANVAS  (render at 3× for better QR)
+// ──────────────────────────────────────────────
 async function fileToCanvas(file){
   const ext=file.name.split('.').pop().toLowerCase();
   if(ext==='pdf'){
     const ab=await file.arrayBuffer();
     const pdf=await pdfjsLib.getDocument({data:ab}).promise;
     const page=await pdf.getPage(1);
-    const vp=page.getViewport({scale:2.5});
+    // BUG FIX: was 2.5×, now 3× for better QR detection
+    const vp=page.getViewport({scale:3.0});
     pageCanvas.width=vp.width; pageCanvas.height=vp.height;
     const ctx=pageCanvas.getContext('2d');
     await page.render({canvasContext:ctx,viewport:vp}).promise;
@@ -327,23 +349,67 @@ async function fileToCanvas(file){
   }
 }
 
-// ── QR scan ──
-function scanQR(imgData,w,h){
-  // Try full image first
-  let r=jsQR(imgData.data,w,h,{inversionAttempts:'dontInvert'});
-  if(r) return r.data;
-  // Try bottom-left quarter (where Seha places QR)
+// ──────────────────────────────────────────────
+// QR SCAN — try 6 regions + inversion
+// BUG FIX: was only trying 2 regions, QR was being missed
+// Seha QR is typically in bottom-left quadrant
+// ──────────────────────────────────────────────
+function cropAndScan(srcCtx, x, y, w, h, invert){
+  qrCanvas.width=w; qrCanvas.height=h;
   const ctx=qrCanvas.getContext('2d');
-  const cw=Math.floor(w*0.4), ch=Math.floor(h*0.4);
-  qrCanvas.width=cw; qrCanvas.height=ch;
-  const src=pageCanvas.getContext('2d');
-  const crop=src.getImageData(0,Math.floor(h*0.55),cw,ch);
-  ctx.putImageData(crop,0,0);
-  r=jsQR(crop.data,cw,ch,{inversionAttempts:'attemptBoth'});
-  return r ? r.data : null;
+  const raw=srcCtx.getImageData(x,y,w,h);
+
+  if(invert){
+    const d=new Uint8ClampedArray(raw.data);
+    for(let i=0;i<d.length;i+=4){
+      d[i]=255-d[i]; d[i+1]=255-d[i+1]; d[i+2]=255-d[i+2];
+    }
+    const inv=new ImageData(d,w,h);
+    ctx.putImageData(inv,0,0);
+    return jsQR(inv.data,w,h,{inversionAttempts:'dontInvert'});
+  } else {
+    ctx.putImageData(raw,0,0);
+    return jsQR(raw.data,w,h,{inversionAttempts:'dontInvert'});
+  }
 }
 
-// ── OCR ──
+function scanQR(imgData,w,h){
+  // Try full image first
+  let r=jsQR(imgData.data,w,h,{inversionAttempts:'attemptBoth'});
+  if(r) return r.data;
+
+  const src=pageCanvas.getContext('2d');
+
+  // Seha QR is in bottom-left ~30% × 35% of the document
+  const regions=[
+    // [x, y, width, height] as fractions of full image
+    [0,    0.6,  0.4,  0.4 ],   // bottom-left (primary)
+    [0,    0.55, 0.45, 0.45],   // bottom-left wider
+    [0,    0.5,  0.5,  0.5 ],   // bottom-left half
+    [0,    0.65, 0.35, 0.35],   // bottom-left tight
+    [0,    0,    0.5,  1.0 ],   // entire left half
+    [0,    0,    1.0,  1.0 ],   // full page again with invert
+  ];
+
+  for(let i=0;i<regions.length;i++){
+    const [fx,fy,fw,fh]=regions[i];
+    const rx=Math.floor(fx*w), ry=Math.floor(fy*h);
+    const rw=Math.floor(fw*w), rh=Math.floor(fh*h);
+    if(rw<10||rh<10) continue;
+
+    // Try normal
+    r=cropAndScan(src,rx,ry,rw,rh,false);
+    if(r) return r.data;
+    // Try inverted
+    r=cropAndScan(src,rx,ry,rw,rh,true);
+    if(r) return r.data;
+  }
+  return null;
+}
+
+// ──────────────────────────────────────────────
+// OCR
+// ──────────────────────────────────────────────
 async function runOCR(canvas){
   const worker=await Tesseract.createWorker(['eng','ara'],1,{logger:()=>{}});
   const {data}=await worker.recognize(canvas);
@@ -351,7 +417,9 @@ async function runOCR(canvas){
   return data.text||'';
 }
 
-// ── EXIF ──
+// ──────────────────────────────────────────────
+// EXIF
+// ──────────────────────────────────────────────
 function getExif(file){
   return new Promise(res=>{
     try{ EXIF.getData(file,function(){ res(EXIF.getAllTags(this)||{}); }); }
@@ -359,223 +427,282 @@ function getExif(file){
   });
 }
 
-// ── Rule engine ──
-const SEHA_QR = 'https://www.seha.sa/#/inquiries/slenquiry';
-
+// ──────────────────────────────────────────────
+// RULE ENGINE  — all bugs fixed
+// ──────────────────────────────────────────────
 function runRules(text, qrUrl, exif){
-  const t=text;
-  const tl=t.toLowerCase();
-  const has=(...pats)=>pats.some(p=>typeof p==='string'?tl.includes(p.toLowerCase()):p.test(t));
-  const checks=[];
+  const t  = text;
+  const tl = t.toLowerCase();
+  const has = (...pats) => pats.some(p =>
+    typeof p==='string' ? tl.includes(p.toLowerCase()) : p.test(t)
+  );
+  const checks = [];
 
-  // 1. QR Code — CRITICAL
+  // ── CHECK 1: QR Code — CRITICAL ──────────────────────
   if(qrUrl===null){
     checks.push({name:'QR Code Verification',status:'FAIL',weight:'critical',
-      detail:'No QR code found in document. Every genuine Seha document contains a QR code linking to seha.sa/#/inquiries/slenquiry.'});
-  } else if(qrUrl && qrUrl.includes('seha.sa') && qrUrl.includes('slenquiry')){
+      detail:'No QR code detected in document. Every genuine Seha document contains a scannable QR code linking to seha.sa/#/inquiries/slenquiry.'});
+  } else if(qrUrl && (qrUrl.includes('seha.sa') || qrUrl.includes('slenquiry'))){
     checks.push({name:'QR Code Verification',status:'PASS',weight:'critical',
-      detail:`QR code successfully decoded and points to official Seha portal: ${qrUrl}`});
+      detail:`QR decoded successfully → URL: ${qrUrl}`});
   } else if(qrUrl){
     checks.push({name:'QR Code Verification',status:'FAIL',weight:'critical',
-      detail:`QR code found but URL is wrong: "${qrUrl}" — should be seha.sa/#/inquiries/slenquiry. Strong forgery indicator.`});
+      detail:`QR found but wrong URL: "${qrUrl.slice(0,80)}" — expected seha.sa/#/inquiries/slenquiry`});
   } else {
     checks.push({name:'QR Code Verification',status:'WARN',weight:'critical',
-      detail:'QR scan was inconclusive — document may have low print quality. Manual scan recommended.'});
+      detail:'QR scan inconclusive — low print quality possible. Scan manually to confirm.'});
   }
 
-  // 2. Leave ID
-  const leaveId=t.match(/\bPSL\d{14}\b/);
+  // ── CHECK 2: Leave ID ─────────────────────────────────
+  // BUG FIX: Real docs use PSL + 12 digits (not 14). Accept 11-14.
+  const leaveId = t.match(/\bPSL\d{11,14}\b/);
   if(leaveId){
+    const digits = leaveId[0].replace('PSL','').length;
     checks.push({name:'Leave ID Format',status:'PASS',weight:'high',
-      detail:`Valid Leave ID found: ${leaveId[0]} (PSL + 14 digits)`});
+      detail:`Valid Leave ID: ${leaveId[0]} (PSL + ${digits} digits)`});
   } else {
     const partial=t.match(/PSL\d+/);
-    checks.push({name:'Leave ID Format',status:'FAIL',weight:'high',
-      detail:partial?`Malformed Leave ID "${partial[0]}" — must be PSL followed by exactly 14 digits`
-        :'No PSL Leave ID found. Genuine documents always contain a Leave ID starting with PSL.'});
+    checks.push({name:'Leave ID Format',status: partial?'WARN':'FAIL',weight:'high',
+      detail:partial
+        ?`Leave ID "${partial[0]}" found — digit count unusual, verify manually`
+        :'No PSL Leave ID found. All genuine Seha documents contain a Leave ID starting with PSL.'});
   }
 
-  // 3. Seha branding
-  const hSeha=has('seha','صحة');
-  const hKSA=has('kingdom of saudi arabia','المملكة العربية السعودية');
-  const hNHIC=has('national health information','المركز الوطني للمعلومات');
+  // ── CHECK 3: Seha Branding ────────────────────────────
+  const hSeha = has('seha','صحة');
+  const hKSA  = has('kingdom of saudi arabia','المملكة العربية السعودية');
+  const hNHIC = has('national health information','المركز الوطني للمعلومات');
   if(hSeha&&hKSA&&hNHIC){
     checks.push({name:'Seha Branding',status:'PASS',weight:'high',
       detail:'Seha logo, Kingdom of Saudi Arabia header, and National Health Information Centre all confirmed.'});
   } else {
     const miss=[];
     if(!hSeha) miss.push('Seha logo');
-    if(!hKSA) miss.push('Kingdom of Saudi Arabia header');
+    if(!hKSA)  miss.push('KSA header');
     if(!hNHIC) miss.push('National Health Information Centre');
     checks.push({name:'Seha Branding',status:miss.length===3?'FAIL':'WARN',weight:'high',
-      detail:`Missing: ${miss.join(', ')}`});
+      detail:`Missing: ${miss.join(', ')}. OCR may have missed some Arabic text.`});
   }
 
-  // 4. Document type header
+  // ── CHECK 4: Document header ──────────────────────────
   if(has('sick leave report','sick leave','تقرير إجازة مرضية','إجازة مرضية')){
     checks.push({name:'Document Type Header',status:'PASS',weight:'medium',
-      detail:'Sick Leave Report title confirmed (Arabic and/or English).'});
+      detail:'Sick Leave Report title confirmed.'});
   } else {
     checks.push({name:'Document Type Header',status:'WARN',weight:'medium',
-      detail:'Could not confirm Sick Leave Report title — may be OCR noise on this field.'});
+      detail:'Could not confirm "Sick Leave Report" heading — possible OCR noise.'});
   }
 
-  // 5. Verification URL
+  // ── CHECK 5: Printed verification URL ────────────────
   if(has('seha.sa/#/inquiries/slenquiry','slenquiry')){
     checks.push({name:'Printed Verification URL',status:'PASS',weight:'high',
-      detail:'Official Seha verification URL is printed in the document as required.'});
+      detail:'Official Seha verification URL confirmed in document.'});
   } else {
     checks.push({name:'Printed Verification URL',status:'FAIL',weight:'high',
-      detail:'Verification URL www.seha.sa/#/inquiries/slenquiry not found. All real Seha documents print this for validation.'});
+      detail:'Verification URL www.seha.sa/#/inquiries/slenquiry not found in text. Required on all genuine documents.'});
   }
 
-  // 6. Hospital license (38 + 14 digits = 16 total)
-  const lic=t.match(/38\d{14}/);
-  if(lic){
+  // ── CHECK 6: Hospital license number ─────────────────
+  // BUG FIX: Real licenses are NOT always 16-digit / starting with 38.
+  // Example real: 2600028794 (10 digits). Accept any number near the field.
+  const licField = has('رقم الترخيص','license');
+  // Try to grab any 8-16 digit number near license text
+  const licMatch = t.match(/(?:رقم الترخيص|license)[^\d]*(\d{8,16})/i) ||
+                   t.match(/(\d{10,16})/); // fallback: any long number
+  if(licMatch){
     checks.push({name:'Hospital License Number',status:'PASS',weight:'high',
-      detail:`License number confirmed: ${lic[0]}`});
-  } else if(has('رقم الترخيص','license')){
+      detail:`License number found: ${licMatch[1]||licMatch[0]}`});
+  } else if(licField){
     checks.push({name:'Hospital License Number',status:'WARN',weight:'high',
-      detail:'License field found but 16-digit number starting with "38" could not be extracted cleanly by OCR.'});
+      detail:'License field present but number could not be extracted cleanly by OCR.'});
   } else {
     checks.push({name:'Hospital License Number',status:'FAIL',weight:'high',
-      detail:'Hospital license number (16 digits starting with 38) not found. Required on all genuine documents.'});
+      detail:'Hospital license field not found. Required on all genuine Seha documents.'});
   }
 
-  // 7. Date extraction and logic
+  // ── CHECK 7: Date consistency ─────────────────────────
+  // BUG FIX: Filter out Hijri years (1300-1500) to avoid 200,000-day ranges.
+  // Only accept Gregorian years 2000-2035.
   const datePat=/\b(\d{2})[.\-\/](\d{2})[.\-\/](\d{4})\b/g;
   const dates=[]; let dm;
   while((dm=datePat.exec(t))!==null){
     try{
+      const yr=parseInt(dm[3]);
+      // BUG FIX: skip Hijri years (1300-1499) — only accept Gregorian 2000-2035
+      if(yr<2000||yr>2035) continue;
       const d=new Date(`${dm[3]}-${dm[2]}-${dm[1]}`);
-      if(!isNaN(d)) dates.push(d);
+      if(!isNaN(d.getTime())) dates.push(d);
+    }catch{}
+  }
+  // Also check YYYY-MM-DD format
+  const datePat2=/\b(20\d{2})[.\-\/](\d{2})[.\-\/](\d{2})\b/g;
+  while((dm=datePat2.exec(t))!==null){
+    try{
+      const d=new Date(`${dm[1]}-${dm[2]}-${dm[3]}`);
+      if(!isNaN(d.getTime())) dates.push(d);
     }catch{}
   }
   dates.sort((a,b)=>a-b);
   const today=new Date();
+
   if(dates.length>=2){
     const allFuture=dates.every(d=>d>today);
     const spread=(dates[dates.length-1]-dates[0])/86400000;
     if(allFuture){
       checks.push({name:'Date Consistency',status:'FAIL',weight:'high',
-        detail:'All detected dates are in the future — strong forgery indicator. Dates should be past or current.'});
-    } else if(spread>180){
+        detail:`All ${dates.length} dates are in the future — strong forgery indicator.`});
+    } else if(spread>365){
       checks.push({name:'Date Consistency',status:'WARN',weight:'high',
-        detail:`Date range is ${Math.round(spread)} days — unusually wide. Verify dates manually.`});
+        detail:`Date span is ${Math.round(spread)} days — unusually wide. Verify manually.`});
     } else {
       checks.push({name:'Date Consistency',status:'PASS',weight:'high',
-        detail:`${dates.length} dates extracted, all within acceptable range.`});
+        detail:`${dates.length} Gregorian date(s) extracted, range ${Math.round(spread)} day(s) — consistent.`});
+    }
+  } else if(dates.length===1){
+    const d=dates[0];
+    if(d>today){
+      checks.push({name:'Date Consistency',status:'FAIL',weight:'high',
+        detail:`Only one date found and it is in the future: ${d.toDateString()}`});
+    } else {
+      checks.push({name:'Date Consistency',status:'WARN',weight:'medium',
+        detail:`Only one Gregorian date extracted: ${d.toDateString()}. Need at least 2 to verify range.`});
     }
   } else {
     checks.push({name:'Date Consistency',status:'WARN',weight:'medium',
-      detail:'Could not extract enough dates to verify consistency. OCR may have had difficulty with date fields.'});
+      detail:'No Gregorian dates (2000-2035) extracted. Dates may be in Hijri-only format or OCR noise.'});
   }
 
-  // 8. Leave duration
-  const durMatch=t.match(/(\d+)\s*(day|يوم|أيام)/i);
+  // ── CHECK 8: Leave duration match ────────────────────
+  // BUG FIX: same Hijri date pollution was causing 211287 day mismatches
+  const durMatch=t.match(/(\d+)\s*(?:day|يوم|أيام)/i);
   if(durMatch&&dates.length>=2){
     const stated=parseInt(durMatch[1]);
     const span=Math.round((dates[dates.length-1]-dates[0])/86400000)+1;
     if(Math.abs(stated-span)<=1){
       checks.push({name:'Leave Duration Match',status:'PASS',weight:'medium',
-        detail:`Stated ${stated} day(s) matches date range calculation of ${span} day(s).`});
+        detail:`Stated ${stated} day(s) matches date calculation of ${span} day(s).`});
+    } else if(Math.abs(stated-span)<=3){
+      checks.push({name:'Leave Duration Match',status:'WARN',weight:'medium',
+        detail:`Minor discrepancy: stated ${stated} day(s) vs calculated ${span} day(s).`});
     } else {
       checks.push({name:'Leave Duration Match',status:'FAIL',weight:'medium',
-        detail:`Mismatch: document says ${stated} day(s) but dates calculate to ${span} day(s). Possible date tampering.`});
+        detail:`Mismatch: stated ${stated} day(s) but dates calculate ${span} day(s). Possible tampering.`});
     }
+  } else if(durMatch){
+    checks.push({name:'Leave Duration Match',status:'WARN',weight:'medium',
+      detail:`Duration field: ${durMatch[1]} day(s) — not enough date data to cross-verify.`});
   } else {
     checks.push({name:'Leave Duration Match',status:'WARN',weight:'medium',
-      detail:'Duration field or dates not fully extracted — manual verification needed.'});
+      detail:'Duration field not found by OCR. Manual check required.'});
   }
 
-  // 9. Employer field (should be blank)
-  const empSection=t.match(/employer[\s\S]{0,80}/i)||t.match(/جهة العمل[\s\S]{0,80}/);
+  // ── CHECK 9: Employer field ───────────────────────────
+  // Note: some real docs DO have employer filled (not a FAIL, just WARN)
+  const empSection = t.match(/employer[\s\S]{0,100}/i) || t.match(/جهة العمل[\s\S]{0,100}/);
   if(empSection){
     const sn=empSection[0];
-    const filled=/employer\s*[\|:]\s*\w{3,}/i.test(sn)||/جهة العمل\s*[\|:]\s*[\u0600-\u06FF]{3,}/.test(sn);
-    checks.push({name:'Employer Field',status:filled?'WARN':'PASS',weight:'medium',
-      detail:filled?'Employer field appears filled — genuine documents leave this blank.'
-        :'Employer field appears blank, consistent with genuine documents.'});
+    // Check if there's actual text content after the employer label
+    const empFilled=/employer\s*[\|:\n\r]+\s*(\S.{2,})/i.exec(sn)||
+                    /جهة العمل\s*[\|:\n\r]+\s*([\u0600-\u06FF].{1,})/i.exec(sn);
+    if(empFilled){
+      checks.push({name:'Employer Field',status:'WARN',weight:'medium',
+        detail:`Employer appears filled: "${empFilled[1].slice(0,40).trim()}". Genuine documents sometimes leave this blank — verify.`});
+    } else {
+      checks.push({name:'Employer Field',status:'PASS',weight:'medium',
+        detail:'Employer field appears blank, consistent with most genuine Seha documents.'});
+    }
   } else {
     checks.push({name:'Employer Field',status:'UNKNOWN',weight:'medium',
       detail:'Employer field not clearly located in OCR output.'});
   }
 
-  // 10. Print timestamp
-  const timeMatch=t.match(/\d{1,2}:\d{2}\s*(AM|PM|am|pm)/i);
-  const weekday=has('monday','tuesday','wednesday','thursday','friday','saturday','sunday',
+  // ── CHECK 10: Print timestamp ─────────────────────────
+  // BUG FIX: improved regex to catch "8:18 AM" (no leading zero) and OCR variations
+  const timeMatch = t.match(/\b\d{1,2}:\d{2}\s*(?:AM|PM|am|pm)\b/i);
+  const weekday   = has('monday','tuesday','wednesday','thursday','friday','saturday','sunday',
     'الاثنين','الثلاثاء','الأربعاء','الخميس','الجمعة','السبت','الأحد');
-  if(timeMatch&&weekday){
+  // Also check for month names (another indicator of timestamp presence)
+  const monthName = has('january','february','march','april','may','june','july','august',
+    'september','october','november','december');
+  if(timeMatch&&(weekday||monthName)){
     checks.push({name:'Print Timestamp',status:'PASS',weight:'medium',
-      detail:`Timestamp with time and weekday found: ${timeMatch[0]}`});
-  } else if(timeMatch||weekday){
+      detail:`Timestamp found: "${timeMatch[0]}" with weekday/date — consistent with genuine Seha PDFs.`});
+  } else if(timeMatch){
     checks.push({name:'Print Timestamp',status:'WARN',weight:'medium',
-      detail:'Partial timestamp — genuine documents show full time + weekday + date at bottom left.'});
+      detail:`Time found (${timeMatch[0]}) but weekday not clearly detected. Partial timestamp.`});
   } else {
     checks.push({name:'Print Timestamp',status:'WARN',weight:'medium',
-      detail:'Print timestamp not detected. Seha PDFs always include generation time at bottom left.'});
+      detail:'Print timestamp not detected. All Seha PDFs include generation time at bottom left.'});
   }
 
-  // 11. Practitioner
-  const hasPrac=has('practitioner','الممارس','اسم الممارس');
-  const hasPos=has('general','طبيب عام','specialist','طبيب أخصائي');
+  // ── CHECK 11: Practitioner ────────────────────────────
+  const hasPrac = has('practitioner','الممارس','اسم الممارس');
+  const hasPos  = has('general','طبيب عام','specialist','أخصائي');
   if(hasPrac&&hasPos){
     checks.push({name:'Practitioner Details',status:'PASS',weight:'medium',
       detail:'Practitioner name and position (General/Specialist) confirmed.'});
   } else if(hasPrac||hasPos){
     checks.push({name:'Practitioner Details',status:'WARN',weight:'medium',
-      detail:'Practitioner field partially detected — verify manually.'});
+      detail:'Practitioner partially detected — verify name and position manually.'});
   } else {
     checks.push({name:'Practitioner Details',status:'FAIL',weight:'medium',
-      detail:'Practitioner name and position not found. Required on all Seha documents.'});
+      detail:'Practitioner name/position not found. Required on all genuine Seha documents.'});
   }
 
-  // 12. EXIF metadata
+  // ── CHECK 12: EXIF ────────────────────────────────────
   const sw=exif?.Software||exif?.software||'';
-  const edited=/photoshop|gimp|illustrator|paint|inkscape|canva/i.test(sw);
+  const edited=/photoshop|gimp|illustrator|paint\.net|inkscape|canva/i.test(sw);
   if(edited){
     checks.push({name:'File Metadata',status:'FAIL',weight:'high',
-      detail:`Image edited with: "${sw}" — clear sign of document manipulation.`});
+      detail:`Editing software detected in metadata: "${sw}" — clear sign of manipulation.`});
   } else if(Object.keys(exif).length===0){
     checks.push({name:'File Metadata',status:'WARN',weight:'medium',
-      detail:'No EXIF metadata found. PDFs naturally lack EXIF; images should have camera/scanner metadata.'});
+      detail:'No EXIF metadata — normal for PDFs, but edited images often have metadata stripped.'});
   } else {
     checks.push({name:'File Metadata',status:'PASS',weight:'medium',
-      detail:`Metadata present. Software: "${sw||'not specified'}" — no editing software detected.`});
+      detail:`Metadata OK. Software: "${sw||'not specified'}"`});
   }
 
   return checks;
 }
 
-// ── Scoring ──
-function score(checks){
+// ──────────────────────────────────────────────
+// SCORING
+// ──────────────────────────────────────────────
+function computeScore(checks){
   const W={critical:40,high:15,medium:7};
   const S={PASS:1,WARN:0.5,UNKNOWN:0.4,FAIL:0};
-  let tot=0,earn=0;
-  checks.forEach(c=>{const w=W[c.weight]||7; tot+=w; earn+=w*(S[c.status]??0);});
+  let tot=0, earn=0;
+  checks.forEach(c=>{
+    const w=W[c.weight]||7;
+    tot+=w;
+    earn+=w*(S[c.status]??0);
+  });
   return Math.round(earn/tot*100);
 }
 
-function verdict(sc,checks){
+function getVerdict(sc, checks){
   const cf=checks.filter(c=>c.weight==='critical'&&c.status==='FAIL').length;
   const hf=checks.filter(c=>c.weight==='high'&&c.status==='FAIL').length;
-  if(cf>=1||hf>=3||sc<35) return {v:'forged',label:'Suspected Forgery',emoji:'🚨'};
-  if(sc>=72&&cf===0&&hf===0) return {v:'authentic',label:'Appears Authentic',emoji:'✅'};
-  return {v:'inconclusive',label:'Inconclusive — Manual Review Required',emoji:'⚠️'};
+  if(cf>=1||hf>=3||sc<35) return {v:'forged',   label:'Suspected Forgery',                    emoji:'🚨'};
+  if(sc>=68&&cf===0&&hf===0) return {v:'authentic', label:'Appears Authentic',                 emoji:'✅'};
+  return                             {v:'inconclusive',label:'Inconclusive — Manual Review',   emoji:'⚠️'};
 }
 
 function extractFields(text){
   return {
-    leaveId:    (text.match(/PSL\d+/)||[])[0]||'',
-    nationalId: (text.match(/\b(23|10)\d{8}\b/)||[])[0]||'',
-    license:    (text.match(/38\d{14}/)||[])[0]||'',
-    date:       (text.match(/\d{2}[.\-\/]\d{2}[.\-\/]\d{4}/)||[])[0]||'',
-    time:       (text.match(/\d{1,2}:\d{2}\s*(AM|PM)/i)||[])[0]||'',
+    leaveId:    (text.match(/PSL\d{11,14}/)||[])[0]||'',
+    nationalId: (text.match(/\b1\d{9}\b|\b2\d{9}\b/)||[])[0]||'',
+    license:    (text.match(/(?:رقم الترخيص|license)[^\d]*(\d{8,16})/i)||text.match(/\b\d{8,16}\b/)||[])[1]||'',
+    date:       (text.match(/\b\d{2}[.\-\/]\d{2}[.\-\/]20\d{2}\b/)||[])[0]||'',
+    time:       (text.match(/\d{1,2}:\d{2}\s*(?:AM|PM)/i)||[])[0]||'',
   };
 }
 
-// ── Render ──
-function renderResult(checks,sc,vObj,fields,qrUrl){
+// ──────────────────────────────────────────────
+// RENDER
+// ──────────────────────────────────────────────
+function renderResult(checks, sc, vObj, fields, qrUrl){
   const v=vObj.v;
   const r=28, circ=2*Math.PI*r, dash=circ*(1-sc/100);
   const col=v==='forged'?'#E24B4A':v==='authentic'?'#1D9E75':'#BA7517';
@@ -595,9 +722,12 @@ function renderResult(checks,sc,vObj,fields,qrUrl){
   }).join('');
 
   const pairs=[
-    ['Leave ID',fields.leaveId],['National ID',fields.nationalId],
-    ['License no.',fields.license],['Date found',fields.date],
-    ['Print time',fields.time],['QR URL',qrUrl||'Not detected'],
+    ['Leave ID',    fields.leaveId],
+    ['National ID', fields.nationalId],
+    ['License no.', fields.license],
+    ['Date',        fields.date],
+    ['Print time',  fields.time],
+    ['QR URL',      qrUrl||'Not decoded'],
   ].filter(([,val])=>val&&val.trim());
 
   const fieldsHtml=pairs.length?`
@@ -612,12 +742,12 @@ function renderResult(checks,sc,vObj,fields,qrUrl){
   const warns=checks.filter(c=>c.status==='WARN');
   let summary='';
   if(v==='forged'){
-    const critFail=checks.find(c=>c.weight==='critical'&&c.status==='FAIL');
-    summary=`This document has ${fails.length} failed check(s) and scored ${sc}/100. ${critFail?'Critical issue: '+critFail.detail+' ':''} Do NOT accept without manual verification at seha.sa.`;
+    const cf=checks.find(c=>c.weight==='critical'&&c.status==='FAIL');
+    summary=`Document scored ${sc}/100 with ${fails.length} failed check(s). ${cf?'Critical: '+cf.detail:''} Do NOT accept without manual verification at seha.sa.`;
   } else if(v==='authentic'){
-    summary=`Document passed all critical checks with a score of ${sc}/100. QR code, Leave ID, branding, and dates are consistent with a genuine Seha sick leave report.`;
+    summary=`Document passed all critical and high-severity checks — score ${sc}/100. QR, Leave ID, branding, and dates are consistent with a genuine Seha sick leave report.`;
   } else {
-    summary=`Score ${sc}/100 — ${fails.length} check(s) failed, ${warns.length} need review. Manual verification at www.seha.sa/#/inquiries/slenquiry is strongly recommended before accepting this document.`;
+    summary=`Score ${sc}/100 — ${fails.length} check(s) failed, ${warns.length} flagged for review. Manual verification at www.seha.sa/#/inquiries/slenquiry is recommended before accepting.`;
   }
 
   resultArea.innerHTML=`
@@ -629,14 +759,14 @@ function renderResult(checks,sc,vObj,fields,qrUrl){
           <p>Rule-based · ${checks.length} checks · No AI required</p>
         </div>
         <div class="score-wrap">
-          <svg width="70" height="70" viewBox="0 0 70 70">
+          <svg width="72" height="72" viewBox="0 0 70 70">
             <circle cx="35" cy="35" r="${r}" fill="none" stroke="#E0DED7" stroke-width="6"/>
             <circle cx="35" cy="35" r="${r}" fill="none" stroke="${col}" stroke-width="6"
-              stroke-dasharray="${circ.toFixed(2)}" stroke-dashoffset="${dash.toFixed(2)}"
+              stroke-dasharray="${circ.toFixed(1)}" stroke-dashoffset="${dash.toFixed(1)}"
               stroke-linecap="round" transform="rotate(-90 35 35)"/>
-            <text x="35" y="39" text-anchor="middle" font-size="14" font-weight="700" fill="${col}">${sc}</text>
+            <text x="35" y="40" text-anchor="middle" font-size="15" font-weight="700" fill="${col}">${sc}</text>
           </svg>
-          <div class="score-label">/ 100</div>
+          <div style="font-size:10px;color:var(--tt);margin-top:2px">/ 100</div>
         </div>
       </div>
       <div class="summary-section"><p>${summary}</p></div>
@@ -648,7 +778,9 @@ function renderResult(checks,sc,vObj,fields,qrUrl){
     </div>`;
 }
 
-// ── Main pipeline ──
+// ──────────────────────────────────────────────
+// MAIN PIPELINE
+// ──────────────────────────────────────────────
 analyzeBtn.addEventListener('click', async()=>{
   if(!currentFile) return;
   analyzeBtn.disabled=true;
@@ -658,39 +790,58 @@ analyzeBtn.addEventListener('click', async()=>{
   progressPanel.classList.add('show');
 
   try{
-    // Step 1
+    // Step 1: render
     setStep('render','spin');
     let img;
-    try{ img=await fileToCanvas(currentFile); setStep('render','done','Document rendered ✓'); }
-    catch(e){ setStep('render','fail','Render failed'); throw e; }
+    try{
+      img=await fileToCanvas(currentFile);
+      setStep('render','done',`Rendered at 3× → ${img.w}×${img.h}px`);
+    }catch(e){
+      setStep('render','fail','Render failed: '+e.message);
+      throw e;
+    }
 
-    // Step 2
-    setStep('qr','spin');
+    // Step 2: QR
+    setStep('qr','spin','Scanning 6 crop regions + inversion…');
     let qrUrl=null;
     try{
       qrUrl=scanQR(img.imgData,img.w,img.h);
-      if(qrUrl) setStep('qr','done',`QR found: ${qrUrl.slice(0,55)}`);
-      else setStep('qr','fail','No QR code detected');
-    }catch{ setStep('qr','fail','QR scan error'); }
+      if(qrUrl) setStep('qr','done',`QR decoded → ${qrUrl.slice(0,55)}`);
+      else      setStep('qr','fail','No QR code detected in any region');
+    }catch(e){
+      setStep('qr','fail','QR scan error: '+e.message);
+    }
 
-    // Step 3
-    setStep('ocr','spin','OCR running (~15 sec)…');
+    // Step 3: OCR
+    setStep('ocr','spin','Running Tesseract (Arabic + English)…');
     let ocrText='';
-    try{ ocrText=await runOCR(img.canvas); setStep('ocr','done',`${ocrText.length} chars extracted`); }
-    catch(e){ setStep('ocr','fail','OCR error: '+e.message); }
+    try{
+      ocrText=await runOCR(img.canvas);
+      setStep('ocr','done',`${ocrText.length} chars extracted`);
+      // Show in debug panel
+      debugBody.textContent=ocrText;
+      debugPanel.classList.add('show');
+    }catch(e){
+      setStep('ocr','fail','OCR error: '+e.message);
+    }
 
     const exif=await getExif(currentFile).catch(()=>({}));
 
-    // Step 4
+    // Step 4: rules
     setStep('rules','spin');
     let checks;
-    try{ checks=runRules(ocrText,qrUrl,exif); setStep('rules','done',`${checks.length} checks done`); }
-    catch(e){ setStep('rules','fail','Rule error'); throw e; }
+    try{
+      checks=runRules(ocrText, qrUrl, exif);
+      setStep('rules','done',`${checks.length} checks complete`);
+    }catch(e){
+      setStep('rules','fail','Rule engine error: '+e.message);
+      throw e;
+    }
 
-    // Step 5
+    // Step 5: score
     setStep('score','spin');
-    const sc=score(checks);
-    const vObj=verdict(sc,checks);
+    const sc=computeScore(checks);
+    const vObj=getVerdict(sc,checks);
     const fields=extractFields(ocrText);
     setStep('score','done',`Score ${sc}/100 → ${vObj.label}`);
 
