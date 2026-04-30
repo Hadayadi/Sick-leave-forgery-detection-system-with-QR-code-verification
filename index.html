@@ -294,7 +294,7 @@ removeBtn.addEventListener('click',()=>{
 // ── Progress steps ──
 const STEPS=[
   {id:'render',label:'Rendering document to high-res image (3×)'},
-  {id:'qr',    label:'Scanning QR code (6 crop regions)'},
+  {id:'qr',    label:'Scanning QR code (multi-region + preprocessing)'},
   {id:'ocr',   label:'Running OCR — Arabic + English extraction'},
   {id:'rules', label:'Applying 12 validation rules'},
   {id:'score', label:'Computing authenticity score'},
@@ -328,10 +328,13 @@ async function fileToCanvas(file){
     const ab=await file.arrayBuffer();
     const pdf=await pdfjsLib.getDocument({data:ab}).promise;
     const page=await pdf.getPage(1);
-    // BUG FIX: was 2.5×, now 3× for better QR detection
+    // Render at 3× for better QR detection
     const vp=page.getViewport({scale:3.0});
     pageCanvas.width=vp.width; pageCanvas.height=vp.height;
     const ctx=pageCanvas.getContext('2d');
+    // White background first (PDFs can be transparent)
+    ctx.fillStyle='#FFFFFF';
+    ctx.fillRect(0,0,vp.width,vp.height);
     await page.render({canvasContext:ctx,viewport:vp}).promise;
     return {canvas:pageCanvas, imgData:ctx.getImageData(0,0,vp.width,vp.height), w:vp.width, h:vp.height};
   } else {
@@ -350,60 +353,138 @@ async function fileToCanvas(file){
 }
 
 // ──────────────────────────────────────────────
-// QR SCAN — try 6 regions + inversion
-// BUG FIX: was only trying 2 regions, QR was being missed
-// Seha QR is typically in bottom-left quadrant
+// QR SCAN — robust multi-attempt with preprocessing
 // ──────────────────────────────────────────────
-function cropAndScan(srcCtx, x, y, w, h, invert){
-  qrCanvas.width=w; qrCanvas.height=h;
-  const ctx=qrCanvas.getContext('2d');
-  const raw=srcCtx.getImageData(x,y,w,h);
 
-  if(invert){
-    const d=new Uint8ClampedArray(raw.data);
-    for(let i=0;i<d.length;i+=4){
-      d[i]=255-d[i]; d[i+1]=255-d[i+1]; d[i+2]=255-d[i+2];
-    }
-    const inv=new ImageData(d,w,h);
-    ctx.putImageData(inv,0,0);
-    return jsQR(inv.data,w,h,{inversionAttempts:'dontInvert'});
-  } else {
-    ctx.putImageData(raw,0,0);
-    return jsQR(raw.data,w,h,{inversionAttempts:'dontInvert'});
+// Convert ImageData to grayscale Uint8ClampedArray
+function toGrayscale(imgData) {
+  const data = imgData.data;
+  const gray = new Uint8ClampedArray(data.length);
+  for (let i = 0; i < data.length; i += 4) {
+    const luminance = 0.299 * data[i] + 0.587 * data[i+1] + 0.114 * data[i+2];
+    gray[i] = gray[i+1] = gray[i+2] = luminance;
+    gray[i+3] = 255;
   }
+  return new ImageData(gray, imgData.width, imgData.height);
 }
 
-function scanQR(imgData,w,h){
-  // Try full image first
-  let r=jsQR(imgData.data,w,h,{inversionAttempts:'attemptBoth'});
-  if(r) return r.data;
+// Apply binary threshold to ImageData
+function threshold(imgData, threshold) {
+  const data = imgData.data;
+  const bin = new Uint8ClampedArray(data.length);
+  for (let i = 0; i < data.length; i += 4) {
+    const avg = (data[i] + data[i+1] + data[i+2]) / 3;
+    const val = avg < threshold ? 0 : 255;
+    bin[i] = bin[i+1] = bin[i+2] = val;
+    bin[i+3] = 255;
+  }
+  return new ImageData(bin, imgData.width, imgData.height);
+}
 
-  const src=pageCanvas.getContext('2d');
+// Invert image data
+function invert(imgData) {
+  const data = imgData.data;
+  const inv = new Uint8ClampedArray(data.length);
+  for (let i = 0; i < data.length; i += 4) {
+    inv[i] = 255 - data[i];
+    inv[i+1] = 255 - data[i+1];
+    inv[i+2] = 255 - data[i+2];
+    inv[i+3] = 255;
+  }
+  return new ImageData(inv, imgData.width, imgData.height);
+}
 
-  // Seha QR is in bottom-left ~30% × 35% of the document
-  const regions=[
-    // [x, y, width, height] as fractions of full image
-    [0,    0.6,  0.4,  0.4 ],   // bottom-left (primary)
-    [0,    0.55, 0.45, 0.45],   // bottom-left wider
-    [0,    0.5,  0.5,  0.5 ],   // bottom-left half
-    [0,    0.65, 0.35, 0.35],   // bottom-left tight
-    [0,    0,    0.5,  1.0 ],   // entire left half
-    [0,    0,    1.0,  1.0 ],   // full page again with invert
+// Try jsQR on given ImageData with options
+function tryDecode(imgData, options = {}) {
+  return jsQR(imgData.data, imgData.width, imgData.height, options);
+}
+
+// Crop canvas region to new ImageData
+function cropImageData(srcCanvas, x, y, w, h) {
+  const temp = document.createElement('canvas');
+  temp.width = w; temp.height = h;
+  const ctx = temp.getContext('2d');
+  ctx.drawImage(srcCanvas, x, y, w, h, 0, 0, w, h);
+  return ctx.getImageData(0, 0, w, h);
+}
+
+function scanQR(imgData, w, h, srcCanvas){
+  // 1. Try full image first with default settings
+  let result = tryDecode(imgData, {inversionAttempts: 'attemptBoth'});
+  if (result) return result.data;
+
+  // 2. Try full image with grayscale
+  result = tryDecode(toGrayscale(imgData), {inversionAttempts: 'attemptBoth'});
+  if (result) return result.data;
+
+  // 3. Try full image with thresholding at multiple levels
+  for (const thr of [100, 128, 150, 180]) {
+    result = tryDecode(threshold(imgData, thr), {inversionAttempts: 'dontInvert'});
+    if (result) return result.data;
+    result = tryDecode(threshold(imgData, thr), {inversionAttempts: 'onlyInvert'});
+    if (result) return result.data;
+  }
+
+  // 4. Try cropped regions — Seha QR is typically bottom-left
+  // Define regions as [x%, y%, width%, height%]
+  const regions = [
+    [0.00, 0.55, 0.45, 0.45],   // bottom-left primary
+    [0.00, 0.60, 0.40, 0.40],   // bottom-left tight
+    [0.00, 0.50, 0.50, 0.50],   // bottom-left half
+    [0.00, 0.65, 0.35, 0.35],   // bottom-left very tight
+    [0.00, 0.70, 0.30, 0.30],   // bottom-left extreme
+    [0.00, 0.00, 0.50, 1.00],   // left half
+    [0.00, 0.00, 1.00, 1.00],   // full (already tried but with different processing)
   ];
 
-  for(let i=0;i<regions.length;i++){
-    const [fx,fy,fw,fh]=regions[i];
-    const rx=Math.floor(fx*w), ry=Math.floor(fy*h);
-    const rw=Math.floor(fw*w), rh=Math.floor(fh*h);
-    if(rw<10||rh<10) continue;
-
-    // Try normal
-    r=cropAndScan(src,rx,ry,rw,rh,false);
-    if(r) return r.data;
-    // Try inverted
-    r=cropAndScan(src,rx,ry,rw,rh,true);
-    if(r) return r.data;
+  for (const [fx, fy, fw, fh] of regions) {
+    const rx = Math.floor(fx * w);
+    const ry = Math.floor(fy * h);
+    const rw = Math.floor(fw * w);
+    const rh = Math.floor(fh * h);
+    
+    if (rw < 50 || rh < 50) continue; // Too small for reliable QR detection
+    
+    const cropped = cropImageData(srcCanvas, rx, ry, rw, rh);
+    
+    // Try raw cropped
+    result = tryDecode(cropped, {inversionAttempts: 'attemptBoth'});
+    if (result) return result.data;
+    
+    // Try grayscale cropped
+    result = tryDecode(toGrayscale(cropped), {inversionAttempts: 'attemptBoth'});
+    if (result) return result.data;
+    
+    // Try thresholded cropped
+    for (const thr of [100, 128, 150]) {
+      result = tryDecode(threshold(cropped, thr), {inversionAttempts: 'dontInvert'});
+      if (result) return result.data;
+      result = tryDecode(threshold(cropped, thr), {inversionAttempts: 'onlyInvert'});
+      if (result) return result.data;
+    }
+    
+    // Try inverted cropped
+    result = tryDecode(invert(cropped), {inversionAttempts: 'dontInvert'});
+    if (result) return result.data;
   }
+
+  // 5. Try downscaled full image (sometimes too high res confuses jsQR)
+  if (w > 1500 || h > 1500) {
+    const scale = 0.5;
+    const temp = document.createElement('canvas');
+    temp.width = Math.floor(w * scale);
+    temp.height = Math.floor(h * scale);
+    const tctx = temp.getContext('2d');
+    tctx.drawImage(srcCanvas, 0, 0, temp.width, temp.height);
+    const scaled = tctx.getImageData(0, 0, temp.width, temp.height);
+    
+    result = tryDecode(scaled, {inversionAttempts: 'attemptBoth'});
+    if (result) return result.data;
+    
+    result = tryDecode(toGrayscale(scaled), {inversionAttempts: 'attemptBoth'});
+    if (result) return result.data;
+  }
+
   return null;
 }
 
@@ -428,7 +509,7 @@ function getExif(file){
 }
 
 // ──────────────────────────────────────────────
-// RULE ENGINE  — all bugs fixed
+// RULE ENGINE
 // ──────────────────────────────────────────────
 function runRules(text, qrUrl, exif){
   const t  = text;
@@ -454,7 +535,6 @@ function runRules(text, qrUrl, exif){
   }
 
   // ── CHECK 2: Leave ID ─────────────────────────────────
-  // BUG FIX: Real docs use PSL + 12 digits (not 14). Accept 11-14.
   const leaveId = t.match(/\bPSL\d{11,14}\b/);
   if(leaveId){
     const digits = leaveId[0].replace('PSL','').length;
@@ -503,12 +583,9 @@ function runRules(text, qrUrl, exif){
   }
 
   // ── CHECK 6: Hospital license number ─────────────────
-  // BUG FIX: Real licenses are NOT always 16-digit / starting with 38.
-  // Example real: 2600028794 (10 digits). Accept any number near the field.
   const licField = has('رقم الترخيص','license');
-  // Try to grab any 8-16 digit number near license text
   const licMatch = t.match(/(?:رقم الترخيص|license)[^\d]*(\d{8,16})/i) ||
-                   t.match(/(\d{10,16})/); // fallback: any long number
+                   t.match(/(\d{10,16})/);
   if(licMatch){
     checks.push({name:'Hospital License Number',status:'PASS',weight:'high',
       detail:`License number found: ${licMatch[1]||licMatch[0]}`});
@@ -521,20 +598,16 @@ function runRules(text, qrUrl, exif){
   }
 
   // ── CHECK 7: Date consistency ─────────────────────────
-  // BUG FIX: Filter out Hijri years (1300-1500) to avoid 200,000-day ranges.
-  // Only accept Gregorian years 2000-2035.
   const datePat=/\b(\d{2})[.\-\/](\d{2})[.\-\/](\d{4})\b/g;
   const dates=[]; let dm;
   while((dm=datePat.exec(t))!==null){
     try{
       const yr=parseInt(dm[3]);
-      // BUG FIX: skip Hijri years (1300-1499) — only accept Gregorian 2000-2035
       if(yr<2000||yr>2035) continue;
       const d=new Date(`${dm[3]}-${dm[2]}-${dm[1]}`);
       if(!isNaN(d.getTime())) dates.push(d);
     }catch{}
   }
-  // Also check YYYY-MM-DD format
   const datePat2=/\b(20\d{2})[.\-\/](\d{2})[.\-\/](\d{2})\b/g;
   while((dm=datePat2.exec(t))!==null){
     try{
@@ -573,7 +646,6 @@ function runRules(text, qrUrl, exif){
   }
 
   // ── CHECK 8: Leave duration match ────────────────────
-  // BUG FIX: same Hijri date pollution was causing 211287 day mismatches
   const durMatch=t.match(/(\d+)\s*(?:day|يوم|أيام)/i);
   if(durMatch&&dates.length>=2){
     const stated=parseInt(durMatch[1]);
@@ -597,11 +669,9 @@ function runRules(text, qrUrl, exif){
   }
 
   // ── CHECK 9: Employer field ───────────────────────────
-  // Note: some real docs DO have employer filled (not a FAIL, just WARN)
   const empSection = t.match(/employer[\s\S]{0,100}/i) || t.match(/جهة العمل[\s\S]{0,100}/);
   if(empSection){
     const sn=empSection[0];
-    // Check if there's actual text content after the employer label
     const empFilled=/employer\s*[\|:\n\r]+\s*(\S.{2,})/i.exec(sn)||
                     /جهة العمل\s*[\|:\n\r]+\s*([\u0600-\u06FF].{1,})/i.exec(sn);
     if(empFilled){
@@ -617,11 +687,9 @@ function runRules(text, qrUrl, exif){
   }
 
   // ── CHECK 10: Print timestamp ─────────────────────────
-  // BUG FIX: improved regex to catch "8:18 AM" (no leading zero) and OCR variations
   const timeMatch = t.match(/\b\d{1,2}:\d{2}\s*(?:AM|PM|am|pm)\b/i);
   const weekday   = has('monday','tuesday','wednesday','thursday','friday','saturday','sunday',
     'الاثنين','الثلاثاء','الأربعاء','الخميس','الجمعة','السبت','الأحد');
-  // Also check for month names (another indicator of timestamp presence)
   const monthName = has('january','february','march','april','may','june','july','august',
     'september','october','november','december');
   if(timeMatch&&(weekday||monthName)){
@@ -802,12 +870,12 @@ analyzeBtn.addEventListener('click', async()=>{
     }
 
     // Step 2: QR
-    setStep('qr','spin','Scanning 6 crop regions + inversion…');
+    setStep('qr','spin','Scanning multi-region with preprocessing…');
     let qrUrl=null;
     try{
-      qrUrl=scanQR(img.imgData,img.w,img.h);
+      qrUrl=scanQR(img.imgData, img.w, img.h, img.canvas);
       if(qrUrl) setStep('qr','done',`QR decoded → ${qrUrl.slice(0,55)}`);
-      else      setStep('qr','fail','No QR code detected in any region');
+      else      setStep('qr','fail','No QR code detected after all attempts');
     }catch(e){
       setStep('qr','fail','QR scan error: '+e.message);
     }
